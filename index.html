@@ -330,8 +330,7 @@
                                     <select id="import-product-select" class="input-control" style="margin-bottom:0;"></select>
                                     <button class="btn-primary" onclick="showCreateSKUModal()" style="width: auto; background-color: var(--status-chogiao-text); padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
                                 </div>
-                                <input type="text" id="import-ref-no" class="input-control" placeholder="Mã Lô hàng" style="flex: 1.5;">
-                                <input type="number" id="import-qty" class="input-control" placeholder="SL" min="1" value="1" style="flex: 1;">
+                                <input type="number" id="import-qty" class="input-control" placeholder="Nhập Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
                                 <button class="btn-primary" onclick="addToImportCart()" style="width: auto; background-color: var(--status-daban-text);">Thêm</button>
                             </div>
                             
@@ -341,7 +340,6 @@
                                         <tr style="font-size:12px;">
                                             <th>SKU</th>
                                             <th>Sản phẩm</th>
-                                            <th>Mã Lô</th>
                                             <th class="text-right">Số lượng</th>
                                             <th style="width:50px;"></th>
                                         </tr>
@@ -405,7 +403,7 @@
                             <h4 class="mb-4" style="font-size:15px;">Thêm mặt hàng xuất kho</h4>
                             <div class="input-group">
                                 <select id="export-product-select" class="input-control" style="flex: 3; margin-bottom:0;"></select>
-                                <input type="number" id="export-qty" class="input-control" placeholder="SL" min="1" value="1" style="flex: 1;">
+                                <input type="number" id="export-qty" class="input-control" placeholder="Nhập Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
                                 <button class="btn-primary" onclick="addToExportCart()" style="width: auto; background-color: var(--status-chogiao-text);">Thêm</button>
                             </div>
 

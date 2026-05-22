@@ -438,15 +438,12 @@ function renderInventorySelects() {
 function addToImportCart() {
     const productId = document.getElementById('import-product-select').value;
     const qty = parseInt(document.getElementById('import-qty').value);
-    let refNo = document.getElementById('import-ref-no').value.trim();
     
     if (!productId) return alert('Vui lòng chọn sản phẩm!');
     if (isNaN(qty) || qty <= 0) return alert('Số lượng phải lớn hơn 0!');
     
-    if (!refNo) {
-        const today = new Date().toISOString().split('T')[0];
-        refNo = today;
-    }
+    const today = new Date().toISOString().split('T')[0];
+    let refNo = "Lô " + today; // Mặc định tự sinh mã lô thay vì nhập tay
     
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -465,7 +462,6 @@ function addToImportCart() {
     }
     
     document.getElementById('import-qty').value = 1;
-    document.getElementById('import-ref-no').value = '';
     renderImportCart();
 }
 
@@ -487,7 +483,6 @@ function renderImportCart() {
         <tr>
             <td><b>${item.product_id}</b></td>
             <td>${item.name}</td>
-            <td>${item.ref_no}</td>
             <td class="text-right">${item.qty}</td>
             <td><button class="btn-action-small danger" onclick="removeFromImportCart(${idx})">×</button></td>
         </tr>
@@ -698,7 +693,6 @@ function renderInventoryTickets() {
                             <tr>
                                 <th>SKU</th>
                                 <th>Sản phẩm</th>
-                                <th>Mã Lô</th>
                                 <th class="text-right">Số lượng</th>
                             </tr>
                         </thead>
@@ -709,7 +703,6 @@ function renderInventoryTickets() {
                                     <tr>
                                         <td><b>${it.product_id}</b></td>
                                         <td>${p ? p.name : 'Sản phẩm không rõ'}</td>
-                                        <td>${it.ref_no || ''}</td>
                                         <td class="text-right">${it.qty}</td>
                                     </tr>
                                 `;
@@ -756,7 +749,6 @@ function renderInventoryTickets() {
                             <tr>
                                 <th>SKU</th>
                                 <th>Sản phẩm</th>
-                                <th>Mã Lô xuất</th>
                                 <th class="text-right">Số lượng</th>
                             </tr>
                         </thead>
@@ -767,7 +759,6 @@ function renderInventoryTickets() {
                                     <tr>
                                         <td><b>${it.product_id}</b></td>
                                         <td>${p ? p.name : 'Sản phẩm không rõ'}</td>
-                                        <td>${it.ref_no || ''}</td>
                                         <td class="text-right">${it.qty}</td>
                                     </tr>
                                 `;
