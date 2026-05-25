@@ -20,27 +20,29 @@
         </div>
     </div>
 
-    <!-- Notification Bell -->
-    <div id="notification-bell" onclick="toggleNotifications()">
-        🔔 <span id="notification-badge" class="badge">0</span>
-    </div>
+    <!-- Notification Bell moved to sidebar -->
 
-    <!-- Notifications Panel -->
-    <div id="notification-panel" class="card" style="display:none; position: fixed; top: 70px; right: 30px; width: 350px; max-height: 400px; overflow-y: auto; z-index: 9998; box-shadow: 0 10px 25px rgba(0,0,0,0.2); padding: 15px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-            <h3 style="margin:0; font-size: 16px;">Thông báo (7 ngày)</h3>
-            <button class="btn-close" onclick="toggleNotifications()" style="font-size:20px;">×</button>
-        </div>
-        <div id="notification-list" style="font-size: 13px; line-height: 1.5; color: var(--text-main);"></div>
-    </div>
+    <!-- Notifications Panel Removed -->
 
     <!-- App Container -->
     <div id="app-container">
         
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
-            <div class="sidebar-header">
-                <h1>CRM-HD</h1>
+            <div class="sidebar-header" style="flex-direction:column; align-items:flex-start; gap:10px;">
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                    <h1 style="margin:0;">CRM-HD</h1>
+                    <div id="quick-note-btn" onclick="openQuickNote()" title="Ghi chú nhanh">
+                        📝
+                    </div>
+                </div>
+                <div style="width:100%; font-size:12px; margin-top:5px;">
+                    <div id="cloud-sync-status" style="margin-bottom:5px; font-weight:600; color:var(--text-muted);">☁️ Cloud DB</div>
+                    <div style="background:var(--input-bg); border-radius:4px; height:8px; width:100%; overflow:hidden;">
+                        <div id="storage-progress-bar" style="height:100%; width:0%; background:#10b981; transition:width 0.3s, background-color 0.3s;"></div>
+                    </div>
+                    <div id="storage-progress-text" style="font-size:10px; color:var(--text-muted); margin-top:3px; text-align:right;">Data: 0/5000 (0%)</div>
+                </div>
             </div>
             <ul class="menu">
                 <li id="menu-sales" onclick="switchTab('sales')" class="active">
@@ -63,14 +65,8 @@
                 </li>
             </ul>
             <div class="sidebar-footer">
-                <button class="btn-primary" onclick="exportDatabase()" style="width: 100%; margin-bottom: 15px; background-color: var(--status-daban-text);">Lưu & Xuất Dữ Liệu</button>
-                <label class="theme-toggle">
-                    <div class="switch">
-                        <input type="checkbox" id="theme-switch" onchange="toggleTheme()">
-                        <span class="slider round"></span>
-                    </div>
-                    <span>Dark Mode</span>
-                </label>
+                <button class="btn-success" onclick="exportDatabase()" style="width: 100%; margin-bottom: 15px; ">Lưu & Xuất Dữ Liệu</button>
+
             </div>
         </nav>
 
@@ -101,7 +97,8 @@
                                         <th>SKU</th>
                                         <th>Sản phẩm</th>
                                         <th>Thông số</th>
-                                        <th>Giá bán</th>
+                                        <th>Giá nhập (Các lô)</th>
+                                        <th>Giá bán (Lịch sử)</th>
                                         <th>Tồn</th>
                                     </tr>
                                 </thead>
@@ -181,8 +178,8 @@
                         <button class="sub-tab-btn" onclick="switchSubTab('crm', 'crm-suppliers', event)">Nhà cung cấp</button>
                     </div>
                     <div>
-                        <button class="btn-primary" onclick="showCreateCustomerModal()" style="width: auto; background-color: var(--status-chogiao-text); margin-right: 10px;">+ Tạo Khách hàng</button>
-                        <button class="btn-primary" onclick="showCreateSupplierModal()" style="width: auto; background-color: var(--status-chogiao-text);">+ Tạo Nhà cung cấp</button>
+                        <button class="btn-warning" onclick="showCreateCustomerModal()" style="width: auto;  margin-right: 10px;">+ Tạo Khách hàng</button>
+                        <button class="btn-warning" onclick="showCreateSupplierModal()" style="width: auto; ">+ Tạo Nhà cung cấp</button>
                     </div>
                 </div>
                 
@@ -237,10 +234,19 @@
             <section id="inventory">
                 <div class="section-header">
                     <h2 class="section-title">Quản Lý Kho Hàng (Xuất Nhập Tồn)</h2>
-                    <div style="display:flex; gap: 10px;">
-                        <input type="file" id="csv-import-file" accept=".csv" style="display:none;" onchange="importCSV(event)">
-                        <button class="btn-primary" onclick="document.getElementById('csv-import-file').click()" style="background-color: var(--status-baogia-text); width: auto;">Nhập CSV (SP/Tồn)</button>
-                        <button class="btn-primary" onclick="exportToCSV(products, 'DanhSachSanPham.csv')" style="background-color: var(--status-daban-text); width: auto;">Xuất CSV SP</button>
+                    <div style="position: relative; display: inline-block;">
+                        <button class="btn-secondary" onclick="toggleCsvDropdown()" style="width: auto; padding: 8px 12px; display:flex; align-items:center; justify-content:center;" title="Tùy chọn">
+                            <span style="font-size: 18px;">⚙️</span>
+                        </button>
+                        <div id="csv-dropdown" class="dropdown-content" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 5px; background-color: var(--card-bg); min-width: 220px; box-shadow: 0px 8px 20px 0px rgba(0,0,0,0.2); z-index: 1000; border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden;">
+                            <input type="file" id="csv-import-file" accept=".csv" style="display:none;" onchange="importCSV(event)">
+                            <a href="#" class="csv-dropdown-item" onclick="downloadCSVTemplate(); toggleCsvDropdown(); return false;" style="color: var(--text-main); padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: all 0.2s;">📄 Tải mẫu CSV</a>
+                            <a href="#" class="csv-dropdown-item" onclick="document.getElementById('csv-import-file').click(); toggleCsvDropdown(); return false;" style="color: var(--text-main); padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: all 0.2s;">📥 Nhập CSV (SP/Tồn)</a>
+                            <a href="#" class="csv-dropdown-item" onclick="exportToCSV(products, 'DanhSachSanPham.csv'); toggleCsvDropdown(); return false;" style="color: var(--text-main); padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: all 0.2s;">📤 Xuất CSV Sản phẩm</a>
+                            <a href="#" class="csv-dropdown-item" onclick="exportXntToCSV(); toggleCsvDropdown(); return false;" style="color: var(--status-daban-text); padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: all 0.2s;">📊 Xuất Excel/CSV Báo Cáo Tồn</a>
+                            <a href="#" class="csv-dropdown-item" onclick="toggleInventoryEditMode(); toggleCsvDropdown(); return false;" style="color: var(--status-chogiao-text); padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; border-bottom: 1px solid var(--border-color); font-size: 14px; transition: all 0.2s;">✏️ Sửa số liệu (Admin)</a>
+                            <a href="#" class="csv-dropdown-item" onclick="runArchiving(); toggleCsvDropdown(); return false;" style="color: #ef4444; padding: 12px 16px; text-decoration: none; display: flex; align-items:center; gap:8px; font-size: 14px; transition: all 0.2s;">🧹 Chốt Sổ (Kiểm Kê Cuối Kỳ)</a>
+                        </div>
                     </div>
                 </div>
                 
@@ -260,13 +266,24 @@
                                 <span style="font-size:14px;">đến</span>
                                 <input type="date" id="xnt-date-to" class="input-control" style="max-width: 150px; margin-bottom:0;" onchange="renderInventory()">
                             </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <select id="xnt-filter-status" class="input-control" style="margin-bottom:0;" onchange="renderInventory()">
+                                    <option value="">-- Trạng thái --</option>
+                                    <option value="safe">An toàn</option>
+                                    <option value="warning">Cảnh báo</option>
+                                    <option value="below">Dưới định mức</option>
+                                    <option value="out">Hết hàng</option>
+                                </select>
+                                <select id="xnt-filter-type" class="input-control" style="margin-bottom:0;" onchange="renderInventory()">
+                                    <option value="">-- Loại linh kiện --</option>
+                                </select>
+                            </div>
                             <div style="display:flex; gap:6px;">
                                 <button class="btn-quick-filter" id="filter-btn-today" onclick="setXntQuickFilter('today')">Hôm nay</button>
                                 <button class="btn-quick-filter active" id="filter-btn-thismonth" onclick="setXntQuickFilter('this-month')">Tháng này</button>
                                 <button class="btn-quick-filter" id="filter-btn-lastmonth" onclick="setXntQuickFilter('last-month')">Tháng trước</button>
                                 <button class="btn-quick-filter" id="filter-btn-all" onclick="setXntQuickFilter('all')">Tất cả</button>
                             </div>
-                            <button class="btn-primary" onclick="exportXntToCSV()" style="width: auto; background-color: var(--status-daban-text); margin-left: auto; margin-bottom:0;">Xuất Excel/CSV Báo Cáo</button>
                         </div>
                     </div>
 
@@ -312,6 +329,10 @@
                                         <select id="import-supplier-select" class="input-control" style="width:100%;"></select>
                                     </div>
                                     <div style="flex:1;">
+                                        <label style="font-weight:600; font-size:12px; display:block; margin-bottom:5px;">Mã phiếu:</label>
+                                        <input type="text" id="import-ticket-id" class="input-control" placeholder="Tự động sinh..." style="width:100%;">
+                                    </div>
+                                    <div style="flex:1;">
                                         <label style="font-weight:600; font-size:12px; display:block; margin-bottom:5px;">Ngày lập:</label>
                                         <input type="datetime-local" id="import-ticket-date" class="input-control" style="width:100%;">
                                     </div>
@@ -327,11 +348,16 @@
                             <h4 class="mb-4" style="font-size:15px;">Thêm mặt hàng nhập kho</h4>
                             <div class="input-group">
                                 <div style="flex: 2; display: flex; gap:5px; align-items:center;">
-                                    <select id="import-product-select" class="input-control" style="margin-bottom:0;"></select>
-                                    <button class="btn-primary" onclick="showCreateSKUModal()" style="width: auto; background-color: var(--status-chogiao-text); padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
+                                    <div class="smart-select-wrapper">
+                                        <input type="text" id="import-product-search" class="input-control" placeholder="Tìm tên hoặc mã SP..." autocomplete="off" style="margin-bottom:0;">
+                                        <input type="hidden" id="import-product-id">
+                                        <div class="smart-select-dropdown" id="import-product-dropdown"></div>
+                                    </div>
+                                    <button class="btn-warning" onclick="showCreateSKUModal()" style="width: auto;  padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
                                 </div>
-                                <input type="number" id="import-qty" class="input-control" placeholder="Nhập Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
-                                <button class="btn-primary" onclick="addToImportCart()" style="width: auto; background-color: var(--status-daban-text);">Thêm</button>
+                                <input type="number" id="import-qty" class="input-control" placeholder="Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
+                                <input type="number" id="import-price" class="input-control" placeholder="Giá nhập" min="0" style="flex: 1;">
+                                <button class="btn-success" onclick="addToImportCart()" style="width: auto; ">Thêm</button>
                             </div>
                             
                             <div style="margin-top:20px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
@@ -388,6 +414,10 @@
                                         <select id="export-customer-select" class="input-control" style="width:100%;"></select>
                                     </div>
                                     <div style="flex:1;">
+                                        <label style="font-weight:600; font-size:12px; display:block; margin-bottom:5px;">Mã phiếu:</label>
+                                        <input type="text" id="export-ticket-id" class="input-control" placeholder="Tự động sinh..." style="width:100%;">
+                                    </div>
+                                    <div style="flex:1;">
                                         <label style="font-weight:600; font-size:12px; display:block; margin-bottom:5px;">Ngày lập:</label>
                                         <input type="datetime-local" id="export-ticket-date" class="input-control" style="width:100%;">
                                     </div>
@@ -402,9 +432,13 @@
 
                             <h4 class="mb-4" style="font-size:15px;">Thêm mặt hàng xuất kho</h4>
                             <div class="input-group">
-                                <select id="export-product-select" class="input-control" style="flex: 3; margin-bottom:0;"></select>
+                                <div class="smart-select-wrapper" style="flex: 3;">
+                                    <input type="text" id="export-product-search" class="input-control" placeholder="Tìm tên hoặc mã SP..." autocomplete="off" style="margin-bottom:0;">
+                                    <input type="hidden" id="export-product-id">
+                                    <div class="smart-select-dropdown" id="export-product-dropdown"></div>
+                                </div>
                                 <input type="number" id="export-qty" class="input-control" placeholder="Nhập Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
-                                <button class="btn-primary" onclick="addToExportCart()" style="width: auto; background-color: var(--status-chogiao-text);">Thêm</button>
+                                <button class="btn-warning" onclick="addToExportCart()" style="width: auto; ">Thêm</button>
                             </div>
 
                             <div style="margin-top:20px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
@@ -420,7 +454,7 @@
                                     <tbody id="export-cart-body" style="font-size:13px;"></tbody>
                                 </table>
                             </div>
-                            <button class="btn-primary mt-4" onclick="createExportTicket()" style="background-color: var(--status-chogiao-text);">Xác Nhận Xuất Kho</button>
+                            <button class="btn-warning mt-4" onclick="createExportTicket()" style="">Xác Nhận Xuất Kho</button>
                         </div>
 
                         <!-- Lịch sử phiếu xuất -->
@@ -613,15 +647,33 @@
                 <h3>Thêm mới Sản phẩm (SKU)</h3>
                 <button class="btn-close" onclick="closeModal('modal-create-sku')">×</button>
             </div>
-            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">
-                <input type="text" id="new-sku-id" class="input-control" placeholder="Mã SKU (VD: SKU006)" style="flex: 1 1 45%;">
-                <input type="text" id="new-sku-name" class="input-control" placeholder="Tên sản phẩm" style="flex: 1 1 45%;">
-                <input type="number" id="new-sku-price_in" class="input-control" placeholder="Giá nhập tiêu chuẩn" style="flex: 1 1 45%;">
-                <input type="number" id="new-sku-price_out" class="input-control" placeholder="Giá bán tiêu chuẩn" style="flex: 1 1 45%;">
-                <input type="text" id="new-sku-unit" class="input-control" placeholder="Đơn vị (Cái, Bộ...)" style="flex: 1 1 45%;">
-                <input type="number" id="new-sku-safe_stock" class="input-control" placeholder="Mức tồn kho an toàn" style="flex: 1 1 45%;">
-                <input type="text" id="new-sku-spec-power" class="input-control" placeholder="CS (VD: 15kW)" style="flex: 1 1 45%;">
-                <input type="text" id="new-sku-spec-type" class="input-control" placeholder="Loại linh kiện" style="flex: 1 1 45%;">
+            <div style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-top: 15px; align-items: center;">
+                <label for="new-sku-id" style="font-weight: 500; color: var(--text-main);">Mã SKU:</label>
+                <input type="text" id="new-sku-id" class="input-control" placeholder="VD: SKU006">
+                
+                <label for="new-sku-name" style="font-weight: 500; color: var(--text-main);">Tên sản phẩm:</label>
+                <input type="text" id="new-sku-name" class="input-control" placeholder="Nhập tên sản phẩm...">
+                
+                <label for="new-sku-price_in" style="font-weight: 500; color: var(--text-main);">Giá nhập:</label>
+                <input type="number" id="new-sku-price_in" class="input-control" placeholder="0">
+                
+                <label for="new-sku-price_out" style="font-weight: 500; color: var(--text-main);">Giá bán:</label>
+                <input type="number" id="new-sku-price_out" class="input-control" placeholder="0">
+                
+                <label for="new-sku-unit" style="font-weight: 500; color: var(--text-main);">Đơn vị tính:</label>
+                <input type="text" id="new-sku-unit" class="input-control" placeholder="VD: Cái, Bộ...">
+                
+                <label for="new-sku-safe_stock" style="font-weight: 500; color: var(--text-main);">Tồn tối thiểu:</label>
+                <input type="number" id="new-sku-safe_stock" class="input-control" placeholder="0">
+                
+                <label for="new-sku-spec-power" style="font-weight: 500; color: var(--text-main);">Công suất:</label>
+                <input type="text" id="new-sku-spec-power" class="input-control" placeholder="VD: 15kW (nếu có)">
+                
+                <label for="new-sku-spec-type" style="font-weight: 500; color: var(--text-main);">Phân loại:</label>
+                <input type="text" id="new-sku-spec-type" class="input-control" placeholder="VD: Linh kiện">
+                
+                <label for="new-sku-note" style="font-weight: 500; color: var(--text-main);">Ghi chú:</label>
+                <input type="text" id="new-sku-note" class="input-control" placeholder="Ghi chú thêm...">
             </div>
             <button class="btn-primary mt-4" onclick="saveNewSKU()">Lưu Sản phẩm</button>
         </div>
@@ -645,7 +697,7 @@
                 <!-- Liên hệ then chốt -->
                 <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
                     <h4 style="margin: 0;">Danh sách người liên hệ</h4>
-                    <button class="btn-primary" style="width: auto; padding: 4px 10px; font-size: 12px; background-color: var(--status-daban-text);" onclick="addContactRow()">+ Thêm người liên hệ</button>
+                    <button class="btn-success" style="width: auto; padding: 4px 10px; font-size: 12px; " onclick="addContactRow()">+ Thêm người liên hệ</button>
                 </div>
                 <div id="contact-list-container" style="width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-height: 200px; overflow-y: auto; padding-right: 5px;">
                     <!-- Dynamic contact rows will be added here -->
@@ -688,7 +740,7 @@
                     <input type="number" id="calc-cost-ship" class="input-control" style="margin-bottom:0;" value="0" oninput="calculatePrice()">
                     
                     <label style="align-self: start; margin-top: 10px;"><b>4. Chi phí khác (Động):</b><br>
-                        <button class="btn-primary" style="width:auto; padding: 4px 8px; font-size: 11px; background-color: var(--status-chogiao-text); margin-top:5px;" onclick="addDynamicCost()">+ Thêm chi phí</button>
+                        <button class="btn-warning" style="width:auto; padding: 4px 8px; font-size: 11px;  margin-top:5px;" onclick="addDynamicCost()">+ Thêm chi phí</button>
                     </label>
                     <div id="calc-dynamic-costs" style="display: flex; flex-direction: column; gap: 10px;"></div>
 
@@ -1114,7 +1166,23 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
         </div>
     </div>
 
+    <!-- Modal Ghi chú Nhanh -->
+    <div id="modal-quick-note" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Ghi chú nhanh</h3>
+                <button class="btn-close" onclick="closeModal('modal-quick-note')">×</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+                <textarea id="quick-note-text" class="input-control" rows="10" style="margin: 0; resize: vertical;" placeholder="Nhập nội dung ghi chú nhanh của bạn ở đây..."></textarea>
+            </div>
+            <button class="btn-primary mt-4" onclick="saveQuickNote()">Lưu Ghi Chú</button>
+        </div>
+    </div>
+
     <script src="data.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
+
+

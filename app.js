@@ -1,4 +1,4 @@
-// --- INIT & AUTH ---
+﻿// --- INIT & AUTH ---
 document.addEventListener('DOMContentLoaded', () => {
     if (!localStorage.getItem('app_password')) localStorage.setItem('app_password', 'admin123');
     if (localStorage.getItem('theme') === 'dark') {
@@ -108,24 +108,25 @@ function checkLogin() {
         const foundUser = users.find(u => u.username === inputUser && u.password === inputPass);
         if(foundUser) {
             currentUser = foundUser;
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
-            initData();
-            applyRBAC();
+            
+            initGoogleSheets();
             return;
         }
     }
     
     // Fallback logic
-    const sysPass = localStorage.getItem('app_password');
-    if (inputUser === 'admin' && inputPass === sysPass) {
-        currentUser = { username: 'admin', role: 'admin', name: 'Admin' };
+    if (inputUser === 'admin' && inputPass === localStorage.getItem('app_password')) {
+        currentUser = { username: 'admin', role: 'admin', name: 'Quản trị viên' };
+        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
-        initData();
-        applyRBAC();
+        
+        initGoogleSheets();
     } else {
-        alert('Tên đăng nhập hoặc mật khẩu không chính xác!');
+        alert('Tài khoản hoặc Mật khẩu không chính xác!');
     }
 }
 
@@ -2077,3 +2078,246 @@ function confirmExportDeliveryPDF() {
         element.style.display = 'none';
     });
 }
+
+
+// GOOGLE SHEETS SYNC MODULE
+// ==========================================
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbzGhY-hJsP61SPKnQn0TfFDVccENnU2D1Zncd2EEKC4tTp4eUzQS3cYJCN9Zi67rXTK/exec';
+let isSyncing = false;
+let syncTimeout = null;
+
+function requestSync() {
+    updateSyncUI('pending');
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+        syncAllDataToGoogle();
+    }, 2000); // 2 second debounce
+}
+
+async function syncAllDataToGoogle() {
+    if (isSyncing) return;
+    isSyncing = true;
+    updateSyncUI('syncing');
+    
+    const payload = {
+        action: 'sync',
+        data: {
+            "Products": arrayToSheet(products),
+            "Customers": arrayToSheet(customers),
+            "Suppliers": arrayToSheet(suppliers),
+            "Quotes": arrayToSheet(quotes),
+            "Inventory_Tickets": arrayToSheet(inventory_tickets),
+            "Cashflow": arrayToSheet(cashflow)
+        }
+    };
+
+    try {
+        await fetch(SHEET_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        
+        // With no-cors, we can't read the response JSON, so we assume success if no network error
+        updateSyncUI('success');
+        updateStorageProgress();
+    } catch (err) {
+        console.error("Sync failed", err);
+        updateSyncUI('error');
+    } finally {
+        isSyncing = false;
+    }
+}
+
+async function initGoogleSheets() {
+    updateSyncUI('syncing');
+    try {
+        const response = await fetch(SHEET_API_URL);
+        const rawData = await response.json();
+        
+        if (rawData.Products && rawData.Products.length > 1) products = sheetToArray(rawData.Products); else products = [];
+        if (rawData.Customers && rawData.Customers.length > 1) customers = sheetToArray(rawData.Customers); else customers = [];
+        if (rawData.Suppliers && rawData.Suppliers.length > 1) suppliers = sheetToArray(rawData.Suppliers); else suppliers = [];
+        if (rawData.Quotes && rawData.Quotes.length > 1) quotes = sheetToArray(rawData.Quotes); else quotes = [];
+        if (rawData.Inventory_Tickets && rawData.Inventory_Tickets.length > 1) inventory_tickets = sheetToArray(rawData.Inventory_Tickets); else inventory_tickets = [];
+        if (rawData.Cashflow && rawData.Cashflow.length > 1) cashflow = sheetToArray(rawData.Cashflow); else cashflow = [];
+        
+        updateSyncUI('success');
+        updateStorageProgress();
+        
+        if (document.getElementById('app-container').style.display !== 'none') {
+            initData();
+        }
+    } catch(err) {
+        alert("KhÃ´ng thá»ƒ káº¿t ná»‘i Google Sheets. Chi tiáº¿t lá»—i: " + err.message);
+        console.error(err);
+        updateSyncUI('error');
+    }
+}
+
+function updateSyncUI(status) {
+    const indicator = document.getElementById('cloud-sync-status');
+    if (!indicator) return;
+    
+    if (status === 'pending') {
+        indicator.innerHTML = '⏳ Pending Sync...';
+        indicator.style.color = 'var(--text-muted)';
+    } else if (status === 'syncing') {
+        indicator.innerHTML = '🔄 Syncing...';
+        indicator.style.color = 'var(--primary-hover)';
+    } else if (status === 'success') {
+        indicator.innerHTML = '✅ Synced to Cloud';
+        indicator.style.color = 'var(--status-daban-text)';
+        setTimeout(() => { if(typeof isSyncing !== 'undefined' && !isSyncing) indicator.innerHTML = '☁️ Cloud DB' }, 3000);
+    } else if (status === 'error') {
+        indicator.innerHTML = '❌ Sync Error!';
+        indicator.style.color = 'var(--status-chogiao-text)';
+    }
+}
+
+function updateStorageProgress() {
+    const progressBar = document.getElementById('storage-progress-bar');
+    const progressText = document.getElementById('storage-progress-text');
+    if (!progressBar || !progressText) return;
+    
+    const MAX_ROWS = 5000;
+    const currentRows = inventory_tickets.length + quotes.length + cashflow.length;
+    let percentage = (currentRows / MAX_ROWS) * 100;
+    if (percentage > 100) percentage = 100;
+    
+    progressBar.style.width = percentage + '%';
+    progressText.innerText = `Data: ${currentRows}/${MAX_ROWS} (${percentage.toFixed(1)}%)`;
+    
+    if (percentage >= 90) {
+        progressBar.style.backgroundColor = '#ef4444'; // Red
+        progressText.style.color = '#ef4444';
+    } else if (percentage >= 70) {
+        progressBar.style.backgroundColor = '#f59e0b'; // Yellow
+        progressText.style.color = '#f59e0b';
+    } else {
+        progressBar.style.backgroundColor = '#10b981'; // Green
+        progressText.style.color = 'var(--text-muted)';
+    }
+}
+
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('button');
+    if (target && !target.classList.contains('btn-quick-filter') && !target.classList.contains('sub-tab-btn')) {
+        requestSync();
+    }
+});
+
+// ==========================================
+// ARCHIVING SYSTEM (CHá»T Sá»”)
+// ==========================================
+function runArchiving() {
+    const pass = prompt('Cáº¢NH BÃO: TÃ­nh nÄƒng Chá»‘t Sá»• sáº½ gom toÃ n bá»™ Tá»“n kho thÃ nh 1 phiáº¿u Äáº§u ká»³ vÃ  XÃ“A sáº¡ch lá»‹ch sá»­ cÃ¡c phiáº¿u cÅ© (BÃ¡o giÃ¡ Ä‘Ã£ bÃ¡n, Phiáº¿u kho cÅ©) Ä‘á»ƒ giáº£i phÃ³ng dung lÆ°á»£ng.\nVui lÃ²ng nháº­p máº­t kháº©u Admin Ä‘á»ƒ tiáº¿p tá»¥c:');
+    if (pass !== localStorage.getItem('app_password')) {
+        if (pass !== null) alert('Mật khẩu không chính xác!');
+        return;
+    }
+    
+    if (!confirm('HÃ nh Ä‘á»™ng nÃ y khÃ´ng thá»ƒ hoÃ n tÃ¡c! Báº¡n cÃ³ CHáº®C CHáº®N muá»‘n chá»‘t sá»• ngay bÃ¢y giá»? (NÃªn copy backup file Google Sheet trÆ°á»›c khi lÃ m viá»‡c nÃ y)')) {
+        return;
+    }
+    
+    updateSyncUI('syncing');
+    
+    // 1. Archive Inventory Tickets
+    const initialItems = [];
+    products.forEach(p => {
+        if (!p.is_deleted && p.stock > 0) {
+            initialItems.push({
+                product_id: p.id,
+                ref_no: 'TON-DAU-KY',
+                qty: p.stock,
+                cost_price: p.price_in || 0,
+                type: 'import'
+            });
+            p.batches = [{
+                ref_no: 'TON-DAU-KY',
+                import_date: new Date().toISOString().split('T')[0],
+                qty: p.stock,
+                cost_price: p.price_in || 0
+            }];
+        }
+    });
+    
+    inventory_tickets = [];
+    if (initialItems.length > 0) {
+        const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+        inventory_tickets.push({
+            id: "TDK-" + Date.now(),
+            date: timestamp,
+            type: 'import',
+            partner_id: "Há»† THá»NG",
+            note: "Phiáº¿u Tá»“n Äáº§u Ká»³ sau khi Chá»‘t Sá»•",
+            items: initialItems
+        });
+    }
+    
+    // 2. Archive Quotes
+    if (typeof quotes !== 'undefined') {
+        const oldQuotesCount = quotes.length;
+        quotes = quotes.filter(q => q.status !== 'daban' && q.status !== 'dahuy');
+        console.log(`Archived ${oldQuotesCount - quotes.length} old quotes.`);
+    }
+    
+    // 3. Archive Cashflow
+    if (typeof cashflow !== 'undefined') {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const oldCashflowCount = cashflow.length;
+        cashflow = cashflow.filter(c => new Date(c.date) > thirtyDaysAgo);
+        console.log(`Archived ${oldCashflowCount - cashflow.length} old cashflow records.`);
+    }
+    
+    syncAllDataToGoogle().then(() => {
+        alert('ÄÃ£ chá»‘t sá»• vÃ  giáº£i phÃ³ng dung lÆ°á»£ng thÃ nh cÃ´ng!');
+        initData();
+    });
+}
+
+// --- SHEET PARSING UTILS ---
+function arrayToSheet(arr) {
+    if (!arr || arr.length === 0) return [];
+    let keys = new Set();
+    arr.forEach(obj => Object.keys(obj).forEach(k => keys.add(k)));
+    keys = Array.from(keys);
+    
+    let result = [keys];
+    arr.forEach(obj => {
+        let row = keys.map(k => {
+            let val = obj[k];
+            if (typeof val === 'object' && val !== null) return JSON.stringify(val);
+            if (val === undefined || val === null) return '';
+            return val;
+        });
+        result.push(row);
+    });
+    return result;
+}
+
+function sheetToArray(sheet) {
+    if (!sheet || sheet.length <= 1) return [];
+    let keys = sheet[0];
+    let result = [];
+    for (let i = 1; i < sheet.length; i++) {
+        let row = sheet[i];
+        if (!row[0]) continue; 
+        let obj = {};
+        keys.forEach((k, idx) => {
+            let val = row[idx];
+            if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+                try { val = JSON.parse(val); } catch(e) {}
+            }
+            obj[k] = val;
+        });
+        result.push(obj);
+    }
+    return result;
+}
+
+
+
