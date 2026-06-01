@@ -1,3 +1,8 @@
+let users = [
+    { username: "admin", password: "123", name: "Quản trị viên", role: "admin" },
+    { username: "guest", password: "", name: "Khách", role: "view_only" }
+];
+
 let products = [
     {
         "id": "B08M1001020TE20",

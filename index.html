@@ -298,10 +298,10 @@
                                         <th>SKU</th>
                                         <th>Sản phẩm</th>
                                         <th>ĐVT</th>
-                                        <th class="text-right" style="background-color:rgba(99,102,241,0.03)">Tồn đầu kỳ</th>
-                                        <th class="text-right" style="background-color:rgba(21,128,61,0.03); color:var(--status-daban-text);">Nhập trong kỳ</th>
-                                        <th class="text-right" style="background-color:rgba(194,65,12,0.03); color:var(--status-chogiao-text);">Xuất trong kỳ</th>
-                                        <th class="text-right" style="background-color:rgba(99,102,241,0.07); font-weight:bold;">Tồn cuối kỳ</th>
+                                        <th class="text-right">Tồn đầu kỳ</th>
+                                        <th class="text-right" style="color:var(--status-daban-text);">Nhập trong kỳ</th>
+                                        <th class="text-right" style="color:var(--status-chogiao-text);">Xuất trong kỳ</th>
+                                        <th class="text-right" style="font-weight:bold;">Tồn cuối kỳ</th>
                                         <th>Định mức</th>
                                         <th>Trạng thái</th>
                                         <th>Thao tác</th>
@@ -618,12 +618,36 @@
                 <div class="section-header">
                     <h2 class="section-title">Quản trị & Cài đặt</h2>
                 </div>
-                <div class="card" style="max-width: 500px;">
-                    <h3 class="mb-4">Đổi Mật Khẩu Hệ Thống</h3>
-                    <input type="password" id="old-pass" class="input-control mb-4" placeholder="Mật khẩu hiện tại" style="width: 100%;">
-                    <input type="password" id="new-pass" class="input-control mb-4" placeholder="Mật khẩu mới" style="width: 100%;">
-                    <input type="password" id="confirm-pass" class="input-control mb-4" placeholder="Nhập lại mật khẩu mới" style="width: 100%;">
-                    <button class="btn-primary" onclick="changePassword()">Cập nhật mật khẩu</button>
+                
+                <div class="grid-2">
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;" class="mb-4">
+                            <h3 style="margin:0;">Quản lý Tài khoản (Users)</h3>
+                            <button class="btn-success" style="width: auto; padding: 6px 12px; font-size: 13px;" onclick="openUserModal()">+ Thêm Tài khoản</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tên đăng nhập</th>
+                                        <th>Tên hiển thị</th>
+                                        <th>Vai trò</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card" style="max-width: 500px;">
+                        <h3 class="mb-4">Đổi Mật Khẩu Hệ Thống</h3>
+                        <p style="color:var(--text-muted); font-size:13px; margin-bottom:15px;">(Dành cho tài khoản cũ không nằm trong danh sách Users)</p>
+                        <input type="password" id="old-pass" class="input-control mb-4" placeholder="Mật khẩu hiện tại" style="width: 100%;">
+                        <input type="password" id="new-pass" class="input-control mb-4" placeholder="Mật khẩu mới" style="width: 100%;">
+                        <input type="password" id="confirm-pass" class="input-control mb-4" placeholder="Nhập lại mật khẩu mới" style="width: 100%;">
+                        <button class="btn-primary" onclick="changePassword()">Cập nhật mật khẩu</button>
+                    </div>
                 </div>
             </section>
         </main>
@@ -1177,6 +1201,36 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
                 <textarea id="quick-note-text" class="input-control" rows="10" style="margin: 0; resize: vertical;" placeholder="Nhập nội dung ghi chú nhanh của bạn ở đây..."></textarea>
             </div>
             <button class="btn-primary mt-4" onclick="saveQuickNote()">Lưu Ghi Chú</button>
+        </div>
+    </div>
+
+    <!-- Modal Quản lý User -->
+    <div id="modal-user" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="modal-user-title">Thêm / Sửa Tài khoản</h3>
+                <button class="btn-close" onclick="closeModal('modal-user')">×</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <input type="hidden" id="user-mode">
+                <input type="hidden" id="user-original-id">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Tên đăng nhập (ID):</label>
+                <input type="text" id="user-username" class="input-control" placeholder="Tên đăng nhập (vd: admin, nhanvien1)">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Mật khẩu:</label>
+                <input type="password" id="user-password" class="input-control" placeholder="Mật khẩu">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Tên hiển thị:</label>
+                <input type="text" id="user-name" class="input-control" placeholder="Tên hiển thị">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Vai trò (Role):</label>
+                <select id="user-role" class="input-control">
+                    <option value="admin">Quản trị viên (Admin)</option>
+                    <option value="view_only">Chỉ xem (View Only)</option>
+                </select>
+            </div>
+            <button class="btn-primary mt-4" onclick="saveUser()">Lưu Tài khoản</button>
         </div>
     </div>
 

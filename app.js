@@ -1,4 +1,4 @@
-﻿// --- INIT & AUTH ---
+// --- INIT & AUTH ---
 document.addEventListener('DOMContentLoaded', () => {
     if (!localStorage.getItem('app_password')) localStorage.setItem('app_password', 'admin123');
     if (localStorage.getItem('theme') === 'dark') {
@@ -161,6 +161,9 @@ function initData() {
     renderSalesProducts(products);
     renderSales();
     renderNotifications();
+    if (currentUser && currentUser.role === 'admin') {
+        renderUsers();
+    }
 }
 
 function toggleTheme() {
@@ -393,9 +396,9 @@ function renderInventory(filteredData = products) {
         
         let actionBtns = p.is_deleted 
             ? `<button class="btn-action-small secondary" onclick="restoreItem('products', '${p.id}')">Khôi phục</button>
-               <button class="btn-action-small danger" style="margin-left:4px;" onclick="hardDeleteItem('products', '${p.id}')">Xóa vĩnh viễn</button>`
+               <button class="btn-action-small danger" style="margin-left:4px;" onclick="deleteItem('products', '${p.id}')">Xóa vĩnh viễn</button>`
             : `<button class="btn-action-small success" onclick="editSKU('${p.id}')">Sửa</button>
-               <button class="btn-action-small danger" style="margin-left:4px;" onclick="softDeleteItem('products', '${p.id}')">Xóa</button>`;
+               <button class="btn-action-small danger" style="margin-left:4px;" onclick="deleteItem('products', '${p.id}')">Xóa</button>`;
                
         return `
             <tr style="${rowStyle}">
@@ -927,9 +930,9 @@ function renderCRM(filteredCus = customers, filteredSup = suppliers) {
             const rowStyle = c.is_deleted ? 'color: var(--text-muted); background: rgba(0,0,0,0.05);' : '';
             let actionBtns = c.is_deleted 
                 ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; background:gray; width:auto;" onclick="event.stopPropagation(); restoreItem('customers', '${c.id}')">Khôi phục</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="event.stopPropagation(); hardDeleteItem('customers', '${c.id}')">Xóa vĩnh viễn</button>`
+                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa vĩnh viễn</button>`
                 : `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto;" onclick="event.stopPropagation(); editPartner('CUS', '${c.id}')">Sửa</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="event.stopPropagation(); softDeleteItem('customers', '${c.id}')">Xóa</button>`;
+                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa</button>`;
             return `<tr style="${rowStyle}" class="clickable" onclick="openCustomerDetail('${c.id}')"><td>${c.id}</td><td>${c.name} ${c.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${c.industry||''}</i></td><td style="font-size: 12px;">${contacts}</td><td>${c.phone}</td><td>${(c.debt_limit||0).toLocaleString()} VNĐ</td><td>${actionBtns}</td></tr>`;
         }).join('');
     }
@@ -941,9 +944,9 @@ function renderCRM(filteredCus = customers, filteredSup = suppliers) {
             const rowStyle = s.is_deleted ? 'color: var(--text-muted); background: rgba(0,0,0,0.05);' : '';
             let actionBtns = s.is_deleted 
                 ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; background:gray; width:auto;" onclick="restoreItem('suppliers', '${s.id}')">Khôi phục</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="hardDeleteItem('suppliers', '${s.id}')">Xóa vĩnh viễn</button>`
+                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa vĩnh viễn</button>`
                 : `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto;" onclick="editPartner('SUP', '${s.id}')">Sửa</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="softDeleteItem('suppliers', '${s.id}')">Xóa</button>`;
+                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa</button>`;
             return `<tr style="${rowStyle}"><td>${s.id}</td><td>${s.name} ${s.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${s.industry||''}</i></td><td style="font-size: 12px;">${contacts}</td><td>${s.phone}</td><td>${s.address}</td><td>${actionBtns}</td></tr>`;
         }).join('');
     }
@@ -1601,30 +1604,60 @@ function saveCalculatedPrice() {
 }
 
 // --- CRUD SYSTEM (Soft & Hard Delete) ---
-function softDeleteItem(type, id) {
+function deleteItem(type, id) {
     if(!confirm('Đưa mục này vào thùng rác? (Sẽ ẩn màu xám)')) return;
-    let arr = window[type];
+    let arr;
+    switch(type) {
+        case 'products': arr = products; break;
+        case 'customers': arr = customers; break;
+        case 'suppliers': arr = suppliers; break;
+        case 'quotes': arr = quotes; break;
+        case 'inventory_tickets': arr = inventory_tickets; break;
+        case 'cashflow': arr = cashflow; break;
+        case 'users': arr = users; break;
+    }
     if(!arr) return;
     const item = arr.find(x => x.id === id);
     if(item) {
         item.is_deleted = true;
         initData();
+        requestSync();
     }
 }
 
 function restoreItem(type, id) {
-    let arr = window[type];
+    let arr;
+    switch(type) {
+        case 'products': arr = products; break;
+        case 'customers': arr = customers; break;
+        case 'suppliers': arr = suppliers; break;
+        case 'quotes': arr = quotes; break;
+        case 'inventory_tickets': arr = inventory_tickets; break;
+        case 'cashflow': arr = cashflow; break;
+        case 'users': arr = users; break;
+    }
     const item = arr.find(x => x.id === id);
     if(item) {
         item.is_deleted = false;
         initData();
+        requestSync();
     }
 }
 
-function hardDeleteItem(type, id) {
+function deleteItem(type, id) {
     if(!confirm('XÓA VĨNH VIỄN? Bạn không thể khôi phục!')) return;
-    window[type] = window[type].filter(x => x.id !== id);
+    let newArr;
+    switch(type) {
+        case 'products': newArr = products.filter(x => x.id !== id); products = newArr; break;
+        case 'customers': newArr = customers.filter(x => x.id !== id); customers = newArr; break;
+        case 'suppliers': newArr = suppliers.filter(x => x.id !== id); suppliers = newArr; break;
+        case 'quotes': newArr = quotes.filter(x => x.id !== id); quotes = newArr; break;
+        case 'inventory_tickets': newArr = inventory_tickets.filter(x => x.id !== id); inventory_tickets = newArr; break;
+        case 'cashflow': newArr = cashflow.filter(x => x.id !== id); cashflow = newArr; break;
+        case 'users': newArr = users.filter(x => x.username !== id); users = newArr; break;
+    }
     initData();
+    requestSync();
 }
 
 function editSKU(id) {
@@ -2102,6 +2135,7 @@ async function syncAllDataToGoogle() {
     const payload = {
         action: 'sync',
         data: {
+            "Users": arrayToSheet(users),
             "Products": arrayToSheet(products),
             "Customers": arrayToSheet(customers),
             "Suppliers": arrayToSheet(suppliers),
@@ -2142,6 +2176,7 @@ async function initGoogleSheets() {
         if (rawData.Quotes && rawData.Quotes.length > 1) quotes = sheetToArray(rawData.Quotes); else quotes = [];
         if (rawData.Inventory_Tickets && rawData.Inventory_Tickets.length > 1) inventory_tickets = sheetToArray(rawData.Inventory_Tickets); else inventory_tickets = [];
         if (rawData.Cashflow && rawData.Cashflow.length > 1) cashflow = sheetToArray(rawData.Cashflow); else cashflow = [];
+        if (rawData.Users && rawData.Users.length > 1) users = sheetToArray(rawData.Users);
         
         updateSyncUI('success');
         updateStorageProgress();
@@ -2319,5 +2354,109 @@ function sheetToArray(sheet) {
     return result;
 }
 
+// --- USER MANAGEMENT ---
+function renderUsers() {
+    const tbody = document.getElementById('admin-users-body');
+    if (!tbody) return;
+    
+    if (typeof users === 'undefined' || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:gray">Chưa có tài khoản nào</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = users.map(u => `
+        <tr>
+            <td><b>${u.username}</b></td>
+            <td>${u.name}</td>
+            <td>${u.role === 'admin' ? '<span style="color:var(--status-daban-text); font-weight:bold;">Quản trị viên</span>' : '<span style="color:var(--text-muted);">Chỉ xem</span>'}</td>
+            <td>
+                <button class="btn-action-small success" onclick="editUser('${u.username}')">Sửa</button>
+                <button class="btn-action-small danger" style="margin-left:4px;" onclick="deleteUser('${u.username}')">Xóa</button>
+            </td>
+        </tr>
+    `).join('');
+}
 
+function openUserModal() {
+    document.getElementById('modal-user-title').innerText = 'Thêm Tài khoản Mới';
+    document.getElementById('user-mode').value = 'add';
+    document.getElementById('user-original-id').value = '';
+    
+    document.getElementById('user-username').value = '';
+    document.getElementById('user-password').value = '';
+    document.getElementById('user-name').value = '';
+    document.getElementById('user-role').value = 'view_only';
+    
+    document.getElementById('user-username').disabled = false;
+    
+    document.getElementById('modal-user').style.display = 'flex';
+}
 
+function editUser(username) {
+    const user = users.find(u => u.username === username);
+    if (!user) return;
+    
+    document.getElementById('modal-user-title').innerText = 'Chỉnh sửa Tài khoản';
+    document.getElementById('user-mode').value = 'edit';
+    document.getElementById('user-original-id').value = username;
+    
+    document.getElementById('user-username').value = user.username;
+    document.getElementById('user-password').value = user.password;
+    document.getElementById('user-name').value = user.name;
+    document.getElementById('user-role').value = user.role;
+    
+    document.getElementById('user-username').disabled = true;
+    
+    document.getElementById('modal-user').style.display = 'flex';
+}
+
+function saveUser() {
+    const mode = document.getElementById('user-mode').value;
+    const originalId = document.getElementById('user-original-id').value;
+    
+    const username = document.getElementById('user-username').value.trim();
+    const password = document.getElementById('user-password').value.trim();
+    const name = document.getElementById('user-name').value.trim();
+    const role = document.getElementById('user-role').value;
+    
+    if (!username || !password || !name) {
+        return alert("Vui lòng điền đầy đủ thông tin (Tên đăng nhập, Mật khẩu, Tên hiển thị)!");
+    }
+    
+    if (mode === 'add') {
+        const existing = users.find(u => u.username === username);
+        if (existing) return alert("Tên đăng nhập này đã tồn tại!");
+        
+        users.push({
+            username: username,
+            password: password,
+            name: name,
+            role: role
+        });
+    } else {
+        const user = users.find(u => u.username === originalId);
+        if (user) {
+            user.password = password;
+            user.name = name;
+            user.role = role;
+        }
+    }
+    
+    closeModal('modal-user');
+    renderUsers();
+    requestSync();
+}
+
+function deleteUser(username) {
+    if (username === 'admin') {
+        return alert("Không thể xóa tài khoản admin mặc định!");
+    }
+    if (currentUser && currentUser.username === username) {
+        return alert("Không thể xóa tài khoản bạn đang đăng nhập!");
+    }
+    if (confirm(`Bạn có chắc chắn muốn xóa tài khoản "${username}" không?`)) {
+        users = users.filter(u => u.username !== username);
+        renderUsers();
+        requestSync();
+    }
+}

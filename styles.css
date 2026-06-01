@@ -333,6 +333,8 @@ section.active {
 /* Tables */
 .table-container {
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: 65vh;
 }
 
 table {
@@ -342,13 +344,16 @@ table {
 }
 
 th {
-    background-color: var(--bg-color);
+    background-color: #1e293b;
     color: var(--text-muted);
     font-weight: 600;
     padding: 12px 16px;
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 td {
