@@ -324,7 +324,7 @@ function renderInventory(filteredData = products) {
     const tbody = document.getElementById('inventory-table-body');
     if (!tbody) return;
     
-    tbody.innerHTML = toDisplay.map(p => {
+    tbody.innerHTML = toDisplay.map((p, index) => {
         let openingStock = p.stock;
         let imported = 0;
         let exported = 0;
@@ -402,6 +402,7 @@ function renderInventory(filteredData = products) {
                
         return `
             <tr style="${rowStyle}">
+                <td>${index + 1}</td>
                 <td><b>${p.id}</b></td>
                 <td>${p.name} ${noteIcon} ${p.is_deleted ? '<i>(Đã xóa)</i>' : ''}</td>
                 <td>${p.unit || 'cái'}</td>
@@ -420,14 +421,62 @@ function renderInventory(filteredData = products) {
     renderInventoryTickets();
 }
 
+// Helper cho Smart Select
+function setupSmartSelect(inputId, hiddenId, dropdownId, dataList) {
+    const input = document.getElementById(inputId);
+    const hidden = document.getElementById(hiddenId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !hidden || !dropdown) return;
+
+    // Dùng cloneNode để xóa các event listener cũ tránh trigger nhiều lần
+    const newInput = input.cloneNode(true);
+    input.parentNode.replaceChild(newInput, input);
+
+    newInput.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase().trim();
+        dropdown.innerHTML = '';
+        if (!val) {
+            dropdown.style.display = 'none';
+            hidden.value = '';
+            return;
+        }
+
+        const filtered = dataList.filter(item => 
+            !item.is_deleted && 
+            (item.id.toLowerCase().includes(val) || item.name.toLowerCase().includes(val))
+        ).slice(0, 50);
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="smart-select-item" style="color: gray;">Không tìm thấy sản phẩm...</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        filtered.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'smart-select-item';
+            div.innerHTML = `<b>${item.id}</b> - ${item.name} <div class="stock-info" style="font-size:11px; color:var(--text-muted);">Tồn: ${item.stock} ${item.unit || 'cái'}</div>`;
+            div.onclick = () => {
+                newInput.value = `${item.id} - ${item.name}`;
+                hidden.value = item.id;
+                dropdown.style.display = 'none';
+            };
+            dropdown.appendChild(div);
+        });
+
+        dropdown.style.display = 'block';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target !== newInput && e.target !== dropdown && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
 function renderInventorySelects() {
-    const activeProducts = products.filter(p => !p.is_deleted);
-    const productOpts = '<option value="">-- Chọn sản phẩm --</option>' + activeProducts.map(p => `<option value="${p.id}">${p.id} - ${p.name} (Tồn: ${p.stock} ${p.unit || 'cái'})</option>`).join('');
-    
-    const impProductSel = document.getElementById('import-product-select');
-    const expProductSel = document.getElementById('export-product-select');
-    if(impProductSel) impProductSel.innerHTML = productOpts;
-    if(expProductSel) expProductSel.innerHTML = productOpts;
+    setupSmartSelect('import-product-search', 'import-product-id', 'import-product-dropdown', products);
+    setupSmartSelect('export-product-search', 'export-product-id', 'export-product-dropdown', products);
     
     const activeSuppliers = suppliers.filter(s => !s.is_deleted);
     const supSel = document.getElementById('import-supplier-select');
@@ -440,10 +489,10 @@ function renderInventorySelects() {
 
 // IMPORT CART & OPERATIONS
 function addToImportCart() {
-    const productId = document.getElementById('import-product-select').value;
+    const productId = document.getElementById('import-product-id').value;
     const qty = parseInt(document.getElementById('import-qty').value);
     
-    if (!productId) return alert('Vui lòng chọn sản phẩm!');
+    if (!productId) return alert('Vui lòng tìm và chọn sản phẩm từ danh sách gợi ý!');
     if (isNaN(qty) || qty <= 0) return alert('Số lượng phải lớn hơn 0!');
     
     const today = new Date().toISOString().split('T')[0];
@@ -465,7 +514,9 @@ function addToImportCart() {
         });
     }
     
-    document.getElementById('import-qty').value = 1;
+    document.getElementById('import-qty').value = '';
+    document.getElementById('import-product-search').value = '';
+    document.getElementById('import-product-id').value = '';
     renderImportCart();
 }
 
@@ -479,21 +530,49 @@ function renderImportCart() {
     if (!tbody) return;
     
     if (importCart.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="color:gray">Chưa có sản phẩm nào</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:gray">Chưa có sản phẩm nào</td></tr>';
         return;
     }
     
-    tbody.innerHTML = importCart.map((item, idx) => `
-        <tr>
-            <td><b>${item.product_id}</b></td>
-            <td>${item.name}</td>
-            <td class="text-right">${item.qty}</td>
-            <td><button class="btn-action-small danger" onclick="removeFromImportCart(${idx})">×</button></td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = importCart.map((item, idx) => {
+        const p = products.find(prod => prod.id === item.product_id);
+        const unit = p ? p.unit || 'cái' : 'cái';
+        return `
+            <tr>
+                <td>${idx + 1}</td>
+                <td><b>${item.product_id}</b></td>
+                <td>${item.name}</td>
+                <td>${unit}</td>
+                <td class="text-right">
+                    <input type="number" class="input-control" style="width: 70px; margin: 0 auto; text-align: center; padding: 4px;" value="${item.qty}" min="1" onchange="updateImportCartQty(${idx}, this.value)">
+                </td>
+                <td><button class="btn-action-small danger" onclick="removeFromImportCart(${idx})">×</button></td>
+            </tr>
+        `;
+    }).join('');
 }
 
-function createImportTicket() {
+function updateImportCartQty(idx, val) {
+    const qty = parseInt(val);
+    if (isNaN(qty) || qty <= 0) return renderImportCart();
+    importCart[idx].qty = qty;
+    renderImportCart();
+}
+
+function clearSKUForm() {
+    document.getElementById('new-sku-id').value = '';
+    document.getElementById('new-sku-name').value = '';
+    document.getElementById('new-sku-price_in').value = '';
+    document.getElementById('new-sku-price_out').value = '';
+    document.getElementById('new-sku-unit').value = 'Cái';
+    document.getElementById('new-sku-safe_stock').value = '';
+    document.getElementById('new-sku-spec-power').value = '';
+    document.getElementById('new-sku-spec-type').value = '';
+}
+
+window.currentProcessingPO = null;
+
+function createImportTicket(isPending = false) {
     const supplierId = document.getElementById('import-supplier-select').value;
     const ticketDate = document.getElementById('import-ticket-date').value.replace('T', ' ');
     const note = document.getElementById('import-ticket-note').value;
@@ -501,33 +580,40 @@ function createImportTicket() {
     if (!supplierId) return alert('Vui lòng chọn Nhà cung cấp!');
     if (importCart.length === 0) return alert('Giỏ hàng trống! Vui lòng thêm sản phẩm.');
     
-    const ticketId = "IMP-" + Date.now();
+    const ticketId = isPending ? "PO-" + Date.now() : "IMP-" + Date.now();
     const today = new Date().toISOString().split('T')[0];
     
-    // Update inventory stock and batches
-    importCart.forEach(item => {
-        const product = products.find(p => p.id === item.product_id);
-        if (product) {
-            if (!product.batches) product.batches = [];
-            const existingBatch = product.batches.find(b => b.ref_no === item.ref_no);
-            if (existingBatch) {
-                existingBatch.qty += item.qty;
-            } else {
-                product.batches.push({
-                    ref_no: item.ref_no,
-                    import_date: ticketDate.split(' ')[0] || today,
-                    qty: item.qty
-                });
+    if (!isPending) {
+        // Update inventory stock and batches
+        importCart.forEach(item => {
+            const product = products.find(p => p.id === item.product_id);
+            if (product) {
+                if (!product.batches) product.batches = [];
+                const existingBatch = product.batches.find(b => b.ref_no === item.ref_no);
+                if (existingBatch) {
+                    existingBatch.qty += item.qty;
+                } else {
+                    product.batches.push({
+                        ref_no: item.ref_no,
+                        import_date: ticketDate.split(' ')[0] || today,
+                        qty: item.qty
+                    });
+                }
+                product.stock = getProductStock(product);
             }
-            product.stock = getProductStock(product);
-        }
-    });
+        });
+    }
+    
+    if (window.currentProcessingPO) {
+        inventory_tickets = inventory_tickets.filter(x => x.id !== window.currentProcessingPO);
+        window.currentProcessingPO = null;
+    }
     
     // Save ticket
     inventory_tickets.push({
         id: ticketId,
         date: ticketDate || new Date().toISOString().replace('T', ' ').split('.')[0],
-        type: 'import',
+        type: isPending ? 'purchase_order' : 'import',
         partner_id: supplierId,
         note: note,
         items: importCart.map(item => ({
@@ -542,15 +628,21 @@ function createImportTicket() {
     document.getElementById('import-ticket-note').value = '';
     renderImportCart();
     initData();
-    alert('Nhập kho thành công!');
+    requestSync();
+    
+    if (isPending) {
+        alert('Lưu Đơn Chờ Hàng (PO) thành công!');
+    } else {
+        alert('Nhập kho thành công!');
+    }
 }
 
 // EXPORT CART & OPERATIONS
 function addToExportCart() {
-    const productId = document.getElementById('export-product-select').value;
+    const productId = document.getElementById('export-product-id').value;
     const qty = parseInt(document.getElementById('export-qty').value);
     
-    if (!productId) return alert('Vui lòng chọn sản phẩm!');
+    if (!productId) return alert('Vui lòng tìm và chọn sản phẩm từ danh sách gợi ý!');
     if (isNaN(qty) || qty <= 0) return alert('Số lượng phải lớn hơn 0!');
     
     const product = products.find(p => p.id === productId);
@@ -575,7 +667,9 @@ function addToExportCart() {
         });
     }
     
-    document.getElementById('export-qty').value = 1;
+    document.getElementById('export-qty').value = '';
+    document.getElementById('export-product-search').value = '';
+    document.getElementById('export-product-id').value = '';
     renderExportCart();
 }
 
@@ -589,18 +683,46 @@ function renderExportCart() {
     if (!tbody) return;
     
     if (exportCart.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:gray">Chưa có sản phẩm nào</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:gray">Chưa có sản phẩm nào</td></tr>';
         return;
     }
     
-    tbody.innerHTML = exportCart.map((item, idx) => `
-        <tr>
-            <td><b>${item.product_id}</b></td>
-            <td>${item.name}</td>
-            <td class="text-right">${item.qty}</td>
-            <td><button class="btn-action-small danger" onclick="removeFromExportCart(${idx})">×</button></td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = exportCart.map((item, idx) => {
+        const p = products.find(prod => prod.id === item.product_id);
+        const unit = p ? p.unit || 'cái' : 'cái';
+        return `
+            <tr>
+                <td>${idx + 1}</td>
+                <td><b>${item.product_id}</b></td>
+                <td>${item.name}</td>
+                <td>${unit}</td>
+                <td class="text-right">
+                    <input type="number" class="input-control" style="width: 70px; margin: 0 auto; text-align: center; padding: 4px;" value="${item.qty}" min="1" onchange="updateExportCartQty(${idx}, this.value)">
+                </td>
+                <td><button class="btn-action-small danger" onclick="removeFromExportCart(${idx})">×</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateExportCartQty(idx, val) {
+    const qty = parseInt(val);
+    if (isNaN(qty) || qty <= 0) return renderExportCart();
+    
+    const item = exportCart[idx];
+    const product = products.find(p => p.id === item.product_id);
+    if (!product) return;
+    
+    const alreadyInCart = exportCart.filter((c, i) => c.product_id === item.product_id && i !== idx).reduce((sum, c) => sum + c.qty, 0);
+    const availableStock = getProductStock(product);
+    
+    if (availableStock < (alreadyInCart + qty)) {
+        alert(`Tồn kho không đủ! (Tồn hiện tại: ${availableStock}, Trong giỏ: ${alreadyInCart}, Nhập mới: ${qty})`);
+        return renderExportCart();
+    }
+    
+    exportCart[idx].qty = qty;
+    renderExportCart();
 }
 
 function createExportTicket() {
@@ -677,6 +799,32 @@ function renderInventoryTickets() {
     
     const imports = inventory_tickets.filter(t => t.type === 'import');
     const exports = inventory_tickets.filter(t => t.type === 'export');
+    const pendingPOs = inventory_tickets.filter(t => t.type === 'purchase_order');
+    
+    const pendingPoBody = document.getElementById('pending-po-body');
+    if (pendingPoBody) {
+        if (pendingPOs.length === 0) {
+            pendingPoBody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:gray">Không có Đơn chờ nào</td></tr>';
+        } else {
+            pendingPoBody.innerHTML = pendingPOs.map((t, index) => {
+                const sup = suppliers.find(s => s.id === t.partner_id);
+                const partnerText = sup ? sup.name : t.partner_id;
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><b style="color:var(--status-chogiao-text);">${t.id}</b></td>
+                        <td>${t.date}</td>
+                        <td>${partnerText}</td>
+                        <td class="text-right">${t.items.length} mặt hàng</td>
+                        <td>
+                            <button class="btn-action-small success" onclick="receivePO('${t.id}')">Nhận hàng</button>
+                            <button class="btn-action-small danger" style="margin-left:4px;" onclick="deleteTicket('${t.id}')">Hủy</button>
+                        </td>
+                    </tr>
+                `;
+            }).reverse().join('');
+        }
+    }
     
     if (importHistoryBody) {
         const filteredImports = imports.filter(t => {
@@ -685,7 +833,7 @@ function renderInventoryTickets() {
             return t.id.toLowerCase().includes(importKw) || supName.includes(importKw);
         });
         
-        importHistoryBody.innerHTML = filteredImports.map(t => {
+        importHistoryBody.innerHTML = filteredImports.map((t, index) => {
             const sup = suppliers.find(s => s.id === t.partner_id);
             const partnerText = sup ? sup.name : t.partner_id;
             
@@ -719,6 +867,7 @@ function renderInventoryTickets() {
             
             return `
                 <tr class="accordion-toggle" onclick="toggleTicketDetails('${t.id}')">
+                    <td>${index + 1}</td>
                     <td><b>${t.id}</b></td>
                     <td>${t.date}</td>
                     <td>${partnerText}</td>
@@ -728,7 +877,7 @@ function renderInventoryTickets() {
                     </td>
                 </tr>
                 <tr id="detail-${t.id}" class="ticket-detail-row" style="display:none;">
-                    <td colspan="5">${detailRowsHtml}</td>
+                    <td colspan="6">${detailRowsHtml}</td>
                 </tr>
             `;
         }).reverse().join('');
@@ -741,7 +890,7 @@ function renderInventoryTickets() {
             return t.id.toLowerCase().includes(exportKw) || cusName.includes(exportKw);
         });
         
-        exportHistoryBody.innerHTML = filteredExports.map(t => {
+        exportHistoryBody.innerHTML = filteredExports.map((t, index) => {
             const cus = customers.find(c => c.id === t.partner_id);
             const partnerText = cus ? cus.name : (t.partner_id === 'RETAIL' ? 'Khách hàng lẻ' : t.partner_id);
             
@@ -775,6 +924,7 @@ function renderInventoryTickets() {
             
             return `
                 <tr class="accordion-toggle" onclick="toggleTicketDetails('${t.id}')">
+                    <td>${index + 1}</td>
                     <td><b>${t.id}</b></td>
                     <td>${t.date}</td>
                     <td>${partnerText}</td>
@@ -785,7 +935,7 @@ function renderInventoryTickets() {
                     </td>
                 </tr>
                 <tr id="detail-${t.id}" class="ticket-detail-row" style="display:none;">
-                    <td colspan="5">${detailRowsHtml}</td>
+                    <td colspan="6">${detailRowsHtml}</td>
                 </tr>
             `;
         }).reverse().join('');
@@ -799,9 +949,47 @@ function toggleTicketDetails(ticketId) {
     }
 }
 
+function receivePO(ticketId) {
+    const t = inventory_tickets.find(x => x.id === ticketId);
+    if (!t) return;
+    
+    window.currentProcessingPO = ticketId;
+    
+    importCart = t.items.map(item => {
+        const p = products.find(prod => prod.id === item.product_id);
+        return {
+            product_id: item.product_id,
+            name: p ? p.name : 'Sản phẩm không rõ',
+            ref_no: item.ref_no || "Lô " + new Date().toISOString().split('T')[0],
+            qty: item.qty
+        };
+    });
+    
+    const supSelect = document.getElementById('import-supplier-select');
+    if (supSelect) supSelect.value = t.partner_id;
+    
+    const noteInput = document.getElementById('import-ticket-note');
+    if (noteInput) noteInput.value = t.note || '';
+    
+    renderImportCart();
+    
+    const importSec = document.getElementById('inv-import');
+    if (importSec) importSec.scrollIntoView({ behavior: 'smooth' });
+}
+
 function deleteTicket(ticketId) {
     const t = inventory_tickets.find(x => x.id === ticketId);
     if (!t) return;
+    
+    if (t.type === 'purchase_order') {
+        if (!confirm(`Bạn có chắc chắn muốn HỦY đơn chờ ${ticketId} không?`)) return;
+        inventory_tickets = inventory_tickets.filter(x => x.id !== ticketId);
+        if (window.currentProcessingPO === ticketId) window.currentProcessingPO = null;
+        initData();
+        requestSync();
+        alert('Hủy Đơn Chờ thành công!');
+        return;
+    }
     
     if (!confirm(`Bạn có chắc chắn muốn HỦY phiếu kho ${ticketId}? Tồn kho và các lô hàng sẽ được hoàn tác tương ứng.`)) return;
     
@@ -929,11 +1117,11 @@ function renderCRM(filteredCus = customers, filteredSup = suppliers) {
             const contacts = c.contacts ? c.contacts.map(ct => `<b>${ct.name}</b> (${ct.role})<br>${ct.phone}`).join('<br><br>') : '';
             const rowStyle = c.is_deleted ? 'color: var(--text-muted); background: rgba(0,0,0,0.05);' : '';
             let actionBtns = c.is_deleted 
-                ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; background:gray; width:auto;" onclick="event.stopPropagation(); restoreItem('customers', '${c.id}')">Khôi phục</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa vĩnh viễn</button>`
-                : `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto;" onclick="event.stopPropagation(); editPartner('CUS', '${c.id}')">Sửa</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa</button>`;
-            return `<tr style="${rowStyle}" class="clickable" onclick="openCustomerDetail('${c.id}')"><td>${c.id}</td><td>${c.name} ${c.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${c.industry||''}</i></td><td style="font-size: 12px;">${contacts}</td><td>${c.phone}</td><td>${(c.debt_limit||0).toLocaleString()} VNĐ</td><td>${actionBtns}</td></tr>`;
+                ? `<button class="btn-action-small secondary" style="width:auto;" onclick="event.stopPropagation(); restoreItem('customers', '${c.id}')">Khôi phục</button>
+                   <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa vĩnh viễn</button>`
+                : `<button class="btn-action-small success" style="width:auto;" onclick="event.stopPropagation(); editPartner('CUS', '${c.id}')">Sửa</button>
+                   <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa</button>`;
+            return `<tr style="${rowStyle}" class="clickable" onclick="openCustomerDetail('${c.id}')"><td>${c.id}</td><td>${c.name} ${c.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${c.industry||''}</i><br><i style="font-size:12px;color:var(--text-muted)">MST: ${c.tax||'---'}</i></td><td style="font-size: 12px;">${contacts}</td><td>${c.phone}</td><td>${(c.debt_limit||0).toLocaleString()} VNĐ</td><td>${actionBtns}</td></tr>`;
         }).join('');
     }
     
@@ -943,11 +1131,11 @@ function renderCRM(filteredCus = customers, filteredSup = suppliers) {
             const contacts = s.contacts ? s.contacts.map(ct => `<b>${ct.name}</b> (${ct.role})<br>${ct.phone}`).join('<br><br>') : '';
             const rowStyle = s.is_deleted ? 'color: var(--text-muted); background: rgba(0,0,0,0.05);' : '';
             let actionBtns = s.is_deleted 
-                ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; background:gray; width:auto;" onclick="restoreItem('suppliers', '${s.id}')">Khôi phục</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:red; margin-top:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa vĩnh viễn</button>`
-                : `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto;" onclick="editPartner('SUP', '${s.id}')">Sửa</button>
-                   <button class="btn-primary" style="padding:4px 8px; font-size:11px; background:var(--status-chogiao-text); margin-top:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa</button>`;
-            return `<tr style="${rowStyle}"><td>${s.id}</td><td>${s.name} ${s.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${s.industry||''}</i></td><td style="font-size: 12px;">${contacts}</td><td>${s.phone}</td><td>${s.address}</td><td>${actionBtns}</td></tr>`;
+                ? `<button class="btn-action-small secondary" style="width:auto;" onclick="restoreItem('suppliers', '${s.id}')">Khôi phục</button>
+                   <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa vĩnh viễn</button>`
+                : `<button class="btn-action-small success" style="width:auto;" onclick="editPartner('SUP', '${s.id}')">Sửa</button>
+                   <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="deleteItem('suppliers', '${s.id}')">Xóa</button>`;
+            return `<tr style="${rowStyle}"><td>${s.id}</td><td>${s.name} ${s.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${s.industry||''}</i><br><i style="font-size:12px;color:var(--text-muted)">MST: ${s.tax||'---'}</i></td><td style="font-size: 12px;">${contacts}</td><td>${s.phone}</td><td>${s.address}</td><td>${actionBtns}</td></tr>`;
         }).join('');
     }
 }
@@ -972,6 +1160,43 @@ function createCashflow() {
     alert('Thêm giao dịch thành công!');
 }
 
+function deleteCashflow(id) {
+    if(!confirm('Bạn có chắc chắn muốn xóa giao dịch này? Hành động này không thể hoàn tác!')) return;
+    cashflow = cashflow.filter(c => c.id !== id);
+    initData();
+    requestSync();
+    alert('Đã xóa giao dịch thành công!');
+}
+
+function editCashflow(id) {
+    const c = cashflow.find(x => x.id === id);
+    if(!c) return;
+    document.getElementById('edit-cf-id').value = c.id;
+    document.getElementById('edit-cf-date').value = c.date;
+    document.getElementById('edit-cf-type').value = c.type;
+    document.getElementById('edit-cf-amount').value = c.amount;
+    document.getElementById('edit-cf-ref').value = c.reference_id || '';
+    document.getElementById('edit-cf-note').value = c.note || '';
+    document.getElementById('modal-edit-cashflow').style.display = 'flex';
+}
+
+function saveEditedCashflow() {
+    const id = document.getElementById('edit-cf-id').value;
+    const c = cashflow.find(x => x.id === id);
+    if(!c) return;
+    
+    c.date = document.getElementById('edit-cf-date').value;
+    c.type = document.getElementById('edit-cf-type').value;
+    c.amount = parseFloat(document.getElementById('edit-cf-amount').value) || 0;
+    c.reference_id = document.getElementById('edit-cf-ref').value;
+    c.note = document.getElementById('edit-cf-note').value;
+    
+    closeModal('modal-edit-cashflow');
+    initData();
+    requestSync();
+    alert('Cập nhật giao dịch thành công!');
+}
+
 function renderFinance() {
     let totalIn = 0;
     let totalOut = 0;
@@ -981,7 +1206,11 @@ function renderFinance() {
         cfTbody.innerHTML = cashflow.map(c => {
             if(c.type === 'in') totalIn += c.amount;
             if(c.type === 'out') totalOut += c.amount;
-            return `<tr><td>${c.date}</td><td>${c.type==='in'?'<span style="color:green;font-weight:bold">Thu</span>':'<span style="color:red;font-weight:bold">Chi</span>'}</td><td>${c.amount.toLocaleString()}</td><td>${c.reference_id}</td><td>${c.note}</td></tr>`;
+            const actionBtns = `
+                <button class="btn-action-small" style="background:#f59e0b; color:white;" onclick="editCashflow('${c.id}')">Sửa</button>
+                <button class="btn-action-small danger" onclick="deleteCashflow('${c.id}')">Xóa</button>
+            `;
+            return `<tr><td>${c.date}</td><td>${c.type==='in'?'<span style="color:green;font-weight:bold">Thu</span>':'<span style="color:red;font-weight:bold">Chi</span>'}</td><td style="font-weight:bold">${c.amount.toLocaleString()}</td><td>${c.reference_id}</td><td>${c.note}</td><td>${actionBtns}</td></tr>`;
         }).reverse().join('');
     }
     
@@ -989,13 +1218,15 @@ function renderFinance() {
     let totalReceivable = 0;
     const recTbody = document.getElementById('finance-receivable-body');
     if(recTbody) {
-        recTbody.innerHTML = contracts.map(ct => {
+        const recRows = contracts.map(ct => {
             const customer = customers.find(c => c.id === ct.customer_id);
             const paid = cashflow.filter(cf => cf.type === 'in' && cf.reference_id === ct.id).reduce((sum, cf) => sum + cf.amount, 0);
             const remaining = ct.total_amount - paid;
-            if(remaining > 0) totalReceivable += remaining;
-            return `<tr><td>${customer?customer.name:ct.customer_id}</td><td>${ct.id}</td><td>${ct.total_amount.toLocaleString()}</td><td style="color:green">${paid.toLocaleString()}</td><td style="${remaining>0?'color:red;font-weight:bold;':''}">${remaining.toLocaleString()}</td></tr>`;
-        }).join('');
+            if (remaining <= 0) return '';
+            totalReceivable += remaining;
+            return `<tr><td>${customer?customer.name:ct.customer_id}</td><td>${ct.id}</td><td>${ct.total_amount.toLocaleString()}</td><td style="color:green">${paid.toLocaleString()}</td><td style="color:red;font-weight:bold;">${remaining.toLocaleString()}</td></tr>`;
+        });
+        recTbody.innerHTML = recRows.join('');
     }
 
     // Update Dashboard
@@ -1088,6 +1319,17 @@ function createQuote() {
     alert('Tạo Báo giá thành công!');
 }
 
+function deleteQuote(qId) {
+    if(!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn Báo giá này?")) return;
+    const qIndex = quotes.findIndex(q => q.id === qId);
+    if(qIndex > -1) {
+        quotes.splice(qIndex, 1);
+        initData();
+        requestSync();
+        alert("Đã xóa báo giá thành công!");
+    }
+}
+
 function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
     const activeCustomers = customers.filter(c => !c.is_deleted);
     const cusSel = document.getElementById('quote-customer-select');
@@ -1100,8 +1342,9 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
             let infoBtn = q.items && q.items.some(item => item.pricing_details) 
                 ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:var(--primary-color); margin-right:5px;" onclick="viewQuotePricing('${q.id}')">Tính giá</button>` : '';
             let printBtn = `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:gray; margin-right:5px;" onclick="exportQuotePDF('${q.id}')">In PDF</button>`;
-            let btn = q.status === 'Chờ duyệt' ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto;" onclick="approveQuote('${q.id}')">Duyệt & Tạo HĐ</button>` : '';
-            return `<tr><td>${q.id} <button class="btn-icon" onclick="openInternalQuoteNote('${q.id}')" style="margin-left:5px; border-radius:50%; width:20px; height:20px; font-size:12px; background:#f59e0b; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Ghi chú nội bộ">i</button></td><td>${q.date}</td><td>${cus?cus.name:q.customer_id}</td><td>${q.total_amount.toLocaleString()}</td><td><span class="status-badge ${q.status==='Đã duyệt'?'status-daban':'status-baogia'}">${q.status}</span></td><td>${printBtn}${infoBtn}${btn}</td></tr>`;
+            let btn = q.status === 'Chờ duyệt' ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; margin-right:5px;" onclick="approveQuote('${q.id}')">Duyệt & Tạo HĐ</button>` : '';
+            let delBtn = q.status === 'Chờ duyệt' ? `<button class="btn-action-small danger" style="padding:4px 8px; font-size:11px; width:auto;" onclick="deleteQuote('${q.id}')">Xóa</button>` : '';
+            return `<tr><td>${q.id} <button class="btn-icon" onclick="openInternalQuoteNote('${q.id}')" style="margin-left:5px; border-radius:50%; width:20px; height:20px; font-size:12px; background:#f59e0b; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Ghi chú nội bộ">i</button></td><td>${q.date}</td><td>${cus?cus.name:q.customer_id}</td><td>${q.total_amount.toLocaleString()}</td><td><span class="status-badge ${q.status==='Đã duyệt'?'status-daban':'status-baogia'}">${q.status}</span></td><td>${printBtn}${infoBtn}${btn}${delBtn}</td></tr>`;
         }).reverse().join('');
     }
     
@@ -1111,72 +1354,156 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
             const cus = customers.find(c => c.id === ct.customer_id);
             const mStone = ct.milestones ? ct.milestones.map(m => `${m.name}: <span style="color:${m.paid?'green':'red'}">${m.paid?'Đã TT':'Chưa TT'}</span>`).join('<br>') : '';
             let exportBtn = `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:var(--status-chogiao-text); margin-top:5px;" onclick="handleSmartExport('${ct.id}')">Xuất kho tự động</button>`;
-            return `<tr><td>${ct.id}<br>${exportBtn}</td><td>${ct.quote_id}</td><td>${ct.date}</td><td>${cus?cus.name:ct.customer_id}</td><td style="font-weight:bold">${ct.total_amount.toLocaleString()}</td><td style="font-size: 12px; line-height:1.4">${mStone}</td></tr>`;
+            
+            let btnAction = ct.status !== 'Hoàn thành' ? `
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <button class="btn-action-small success" onclick="openPaymentTracking('${ct.id}')">Thu tiền</button>
+                    <button class="btn-action-small danger" onclick="cancelContract('${ct.id}')">Hủy & Làm lại</button>
+                </div>
+            ` : `<button class="btn-action-small" style="background:#3b82f6; color:white;" onclick="openPaymentTracking('${ct.id}')">Lịch sử thu</button>`;
+            
+            return `<tr><td>${ct.id}<br>${exportBtn}</td><td>${ct.quote_id}</td><td>${ct.date}</td><td>${cus?cus.name:ct.customer_id}</td><td style="font-weight:bold">${ct.total_amount.toLocaleString()}</td><td style="font-size: 12px; line-height:1.4">${mStone}</td><td><span class="status-badge ${ct.status==='Hoàn thành'?'status-daban':'status-baogia'}">${ct.status}</span></td><td>${btnAction}</td></tr>`;
         }).reverse().join('');
     }
 }
 
-function handleSmartExport(contractId) {
-    if(!confirm("Hệ thống sẽ tự động trừ kho dựa trên Báo giá của hợp đồng này. Bạn có chắc chắn?")) return;
-    
+function openContractExport(contractId) {
     const ct = contracts.find(x => x.id === contractId);
     if(!ct) return alert("Không tìm thấy hợp đồng!");
     
     const q = quotes.find(x => x.id === ct.quote_id);
     if(!q || !q.items) return alert("Không tìm thấy chi tiết báo giá cho hợp đồng này!");
     
-    let successCount = 0;
-    const today = new Date().toISOString().replace('T', ' ').split('.')[0];
+    document.getElementById('export-contract-id').value = contractId;
     
-    const ticketId = "EXP-" + Date.now();
-    const ticketItems = [];
+    const relatedExports = inventory_tickets.filter(t => t.type === 'export' && t.reference_contract === contractId);
     
-    for (let item of q.items) {
+    const tbody = document.getElementById('contract-export-body');
+    tbody.innerHTML = q.items.map((item, idx) => {
         const product = products.find(p => p.id === item.product_id);
-        if(!product) continue;
+        const pName = product ? product.name : item.product_id;
         
-        let qtyToExport = item.qty;
-        if(getProductStock(product) < qtyToExport) {
-            alert(`Sản phẩm ${product.name} không đủ tồn kho để xuất!`);
+        let exportedQty = 0;
+        relatedExports.forEach(ticket => {
+            ticket.items.forEach(ti => {
+                if(ti.product_id === item.product_id) exportedQty += ti.qty;
+            });
+        });
+        
+        const remainingQty = item.qty - exportedQty;
+        
+        return `
+            <tr>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px;">${pName}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">${item.qty}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center; color:green;">${exportedQty}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center; color:red; font-weight:bold;">${remainingQty}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">
+                    <input type="number" class="input-control export-qty-input" data-pid="${item.product_id}" data-remain="${remainingQty}" value="${remainingQty}" min="0" max="${remainingQty}" style="width:80px; margin:0 auto; text-align:center;" ${remainingQty===0?'disabled':''}>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    document.getElementById('modal-contract-export').style.display = 'flex';
+}
+
+function confirmContractExport() {
+    const ctId = document.getElementById('export-contract-id').value;
+    const ct = contracts.find(x => x.id === ctId);
+    if(!ct) return;
+    
+    const inputs = document.querySelectorAll('.export-qty-input');
+    const ticketItems = [];
+    let hasError = false;
+    
+    inputs.forEach(input => {
+        const pid = input.getAttribute('data-pid');
+        const remain = parseInt(input.getAttribute('data-remain'));
+        const qtyToExport = parseInt(input.value) || 0;
+        
+        if (qtyToExport < 0 || qtyToExport > remain) {
+            alert(`Số lượng xuất không hợp lệ cho mặt hàng ${pid}!`);
+            hasError = true;
             return;
         }
         
-        // FIFO Export
-        if(product.batches) {
-            product.batches.sort((a,b) => new Date(a.import_date) - new Date(b.import_date));
-            for(let i=0; i<product.batches.length; i++) {
-                if(qtyToExport === 0) break;
-                const b = product.batches[i];
-                if(b.qty > 0) {
-                    const deduct = Math.min(b.qty, qtyToExport);
-                    b.qty -= deduct;
-                    qtyToExport -= deduct;
-                    ticketItems.push({
-                        product_id: product.id,
-                        ref_no: b.ref_no || b.import_date,
-                        qty: deduct
-                    });
-                }
+        if (qtyToExport > 0) {
+            const product = products.find(p => p.id === pid);
+            if (!product) return;
+            
+            if (getProductStock(product) < qtyToExport) {
+                alert(`Sản phẩm ${product.name} chỉ còn ${getProductStock(product)} tồn kho, không đủ để xuất ${qtyToExport}!`);
+                hasError = true;
+                return;
             }
-            product.batches = product.batches.filter(b => b.qty > 0);
-            product.stock = getProductStock(product);
-            successCount++;
+            
+            let qtyLeft = qtyToExport;
+            if(product.batches) {
+                product.batches.sort((a,b) => new Date(a.import_date) - new Date(b.import_date));
+                for(let i=0; i<product.batches.length; i++) {
+                    if(qtyLeft === 0) break;
+                    const b = product.batches[i];
+                    if(b.qty > 0) {
+                        const deduct = Math.min(b.qty, qtyLeft);
+                        b.qty -= deduct;
+                        qtyLeft -= deduct;
+                        ticketItems.push({
+                            product_id: product.id,
+                            ref_no: b.ref_no || b.import_date,
+                            qty: deduct
+                        });
+                    }
+                }
+                product.batches = product.batches.filter(b => b.qty > 0);
+                product.stock = getProductStock(product);
+            }
         }
-    }
+    });
     
-    if(ticketItems.length > 0) {
+    if (hasError) return;
+    
+    if (ticketItems.length > 0) {
+        const ticketId = "EXP-" + Date.now();
+        const today = new Date().toISOString().replace('T', ' ').split('.')[0];
+        
         inventory_tickets.push({
             id: ticketId,
             date: today,
             type: 'export',
             partner_id: ct.customer_id,
-            note: `Xuất tự động từ HĐ ${contractId}`,
+            note: `Giao hàng đợt mới từ HĐ ${ctId}`,
+            reference_contract: ctId,
             items: ticketItems
         });
-        alert("Xuất kho tự động thành công!");
+        
+        // Evaluate if fully exported to update contract status
+        const q = quotes.find(x => x.id === ct.quote_id);
+        const relatedExports = inventory_tickets.filter(t => t.type === 'export' && t.reference_contract === ct.id);
+        
+        let allExported = true;
+        if (q && q.items) {
+            q.items.forEach(item => {
+                let exportedQty = 0;
+                relatedExports.forEach(ticket => {
+                    ticket.items.forEach(ti => {
+                        if(ti.product_id === item.product_id) exportedQty += ti.qty;
+                    });
+                });
+                if (exportedQty < item.qty) allExported = false;
+            });
+        }
+        
+        if (allExported) {
+            ct.is_exported = true; // Mark as fully exported
+        }
+        
+        closeModal('modal-contract-export');
+        alert("Xuất kho Giao hàng thành công!");
         initData();
+        requestSync();
     } else {
-        alert("Không có sản phẩm nào được xuất!");
+        alert("Không có sản phẩm nào được chọn để xuất!");
     }
 }
 
@@ -1215,18 +1542,140 @@ function viewQuotePricing(qId) {
     document.getElementById('note-modal').style.display = 'flex';
 }
 
+window.currentApprovingQuote = null;
+
 function approveQuote(qId) {
+    window.currentApprovingQuote = qId;
+    document.getElementById('payment-scenario').value = 'deposit';
+    toggleDepositInput();
+    document.getElementById('deposit-percent').value = 50;
+    document.getElementById('modal-payment-terms').style.display = 'flex';
+}
+
+function toggleDepositInput() {
+    const s = document.getElementById('payment-scenario').value;
+    document.getElementById('deposit-input-group').style.display = s === 'deposit' ? 'block' : 'none';
+}
+
+function confirmContractCreation() {
+    const qId = window.currentApprovingQuote;
     const quote = quotes.find(q => q.id === qId);
-    if(quote) {
-        quote.status = 'Đã duyệt';
-        const ctId = 'HD-' + Date.now();
-        contracts.push({
-            id: ctId, quote_id: quote.id, date: new Date().toISOString().split('T')[0], customer_id: quote.customer_id, total_amount: quote.total_amount, status: 'Đang thực hiện',
-            milestones: [{name: "Tạm ứng 50%", amount: quote.total_amount*0.5, paid: false}, {name: "Giao hàng 50%", amount: quote.total_amount*0.5, paid: false}]
-        });
-        alert('Đã duyệt Báo giá và Tự động tạo Hợp đồng: ' + ctId);
-        initData();
+    if (!quote) return;
+    
+    const scenario = document.getElementById('payment-scenario').value;
+    const depositPercent = parseInt(document.getElementById('deposit-percent').value) || 0;
+    
+    let milestones = [];
+    if (scenario === 'deposit') {
+        if (depositPercent <= 0 || depositPercent >= 100) return alert('Phần trăm đặt cọc phải từ 1 đến 99');
+        milestones = [
+            { name: `Đặt cọc ${depositPercent}%`, amount: quote.total_amount * (depositPercent / 100), paid: false },
+            { name: `Thanh toán sau giao hàng ${100 - depositPercent}%`, amount: quote.total_amount * ((100 - depositPercent) / 100), paid: false }
+        ];
+    } else if (scenario === 'prepaid') {
+        milestones = [{ name: "Thanh toán 100% trước giao hàng", amount: quote.total_amount, paid: false }];
+    } else if (scenario === 'postpaid') {
+        milestones = [{ name: "Thanh toán 100% sau giao hàng", amount: quote.total_amount, paid: false }];
     }
+    
+    quote.status = 'Đã duyệt';
+    const ctId = 'HD-' + Date.now();
+    contracts.push({
+        id: ctId, 
+        quote_id: quote.id, 
+        date: new Date().toISOString().split('T')[0], 
+        customer_id: quote.customer_id, 
+        total_amount: quote.total_amount, 
+        status: 'Đang thực hiện',
+        milestones: milestones
+    });
+    
+    closeModal('modal-payment-terms');
+    alert('Đã duyệt Báo giá và tạo Hợp đồng: ' + ctId);
+    initData();
+    requestSync();
+}
+
+function cancelContract(ctId) {
+    const ctIndex = contracts.findIndex(c => c.id === ctId);
+    if(ctIndex === -1) return;
+    const ct = contracts[ctIndex];
+    
+    const hasCashflow = cashflow.some(cf => cf.reference_id === ct.id);
+    
+    if (hasCashflow) {
+        return alert("Hợp đồng này đã có lịch sử thu tiền trong Sổ Quỹ! Bạn phải Xóa phiếu thu đó bên trang Tài chính trước khi hủy Hợp đồng.");
+    }
+    
+    if(!confirm("Bạn có chắc chắn muốn hủy Hợp đồng này và trả Báo giá về trạng thái Chờ duyệt?")) return;
+    
+    const q = quotes.find(q => q.id === ct.quote_id);
+    if(q) q.status = 'Chờ duyệt';
+    
+    contracts.splice(ctIndex, 1);
+    
+    alert("Hủy Hợp đồng thành công!");
+    initData();
+    requestSync(true); // Sync ngay lập tức không chờ 2s
+}
+
+function openPaymentTracking(ctId) {
+    const ct = contracts.find(c => c.id === ctId);
+    if(!ct) return;
+    
+    document.getElementById('tracking-contract-id').value = ctId;
+    const tbody = document.getElementById('payment-tracking-body');
+    
+    tbody.innerHTML = (ct.milestones || []).map((m, idx) => {
+        const actionBtn = m.paid ? 
+            `<span style="color:gray; font-size:12px;">Đã thu</span>` : 
+            `<button class="btn-action-small success" onclick="collectMilestone('${ct.id}', ${idx})">Xác nhận Thu</button>`;
+            
+        return `
+            <tr>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px;">${m.name}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: right; font-weight:bold;">${m.amount.toLocaleString()}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center; color:${m.paid?'green':'red'}">${m.paid?'Đã thanh toán':'Chưa thanh toán'}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">${actionBtn}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    document.getElementById('modal-payment-tracking').style.display = 'flex';
+}
+
+function collectMilestone(ctId, milestoneIndex) {
+    const ct = contracts.find(c => c.id === ctId);
+    if(!ct) return;
+    
+    if(!confirm("Xác nhận đã thu tiền cho mốc này? Hệ thống sẽ tự động tạo một Phiếu Thu vào Sổ Quỹ.")) return;
+    
+    const m = ct.milestones[milestoneIndex];
+    m.paid = true;
+    
+    // Create Cashflow In
+    cashflow.push({
+        id: "CF-" + Date.now(),
+        date: new Date().toISOString().split('T')[0],
+        type: 'in', 
+        amount: m.amount, 
+        reference_id: ct.id, 
+        note: `Thu tiền: ${m.name}`
+    });
+    
+    // Check if all paid
+    const allPaid = ct.milestones.every(ms => ms.paid);
+    if (allPaid) {
+        ct.status = 'Hoàn thành';
+        alert("Đã thu đủ 100% tiền. Hợp đồng chuyển sang trạng thái Hoàn thành!");
+    } else {
+        alert("Đã xác nhận thu tiền và tạo Phiếu Thu!");
+    }
+    
+    initData();
+    requestSync();
+    
+    openPaymentTracking(ctId);
 }
 
 
@@ -1349,7 +1798,9 @@ function saveNewSKU() {
     }
     
     closeModal('modal-create-sku');
+    clearSKUForm();
     initData();
+    requestSync();
 }
 
 // 2. CRM Partners
@@ -1373,6 +1824,7 @@ function resetPartnerFields() {
     document.getElementById('new-partner-id').value = '';
     document.getElementById('new-partner-name').value = '';
     document.getElementById('new-partner-industry').value = '';
+    document.getElementById('new-partner-tax').value = '';
     document.getElementById('new-partner-phone').value = '';
     document.getElementById('new-partner-address').value = '';
     document.getElementById('contact-list-container').innerHTML = '';
@@ -1399,6 +1851,7 @@ function saveNewPartner() {
     const id = document.getElementById('new-partner-id').value;
     const name = document.getElementById('new-partner-name').value;
     const industry = document.getElementById('new-partner-industry').value;
+    const tax = document.getElementById('new-partner-tax').value;
     const phone = document.getElementById('new-partner-phone').value;
     const address = document.getElementById('new-partner-address').value;
     
@@ -1419,12 +1872,13 @@ function saveNewPartner() {
     if (existingP) {
         existingP.name = name;
         existingP.industry = industry;
+        existingP.tax = tax;
         existingP.phone = phone;
         existingP.address = address;
         existingP.contacts = contactsList;
         alert("Cập nhật đối tác thành công!");
     } else {
-        const partnerData = { id, name, industry, phone, address, contacts: contactsList };
+        const partnerData = { id, name, industry, tax, phone, address, contacts: contactsList };
         
         if(type === 'CUS') {
             partnerData.debt_limit = 0;
@@ -1438,6 +1892,7 @@ function saveNewPartner() {
     
     closeModal('modal-create-partner');
     initData();
+    requestSync();
 }
 
 // 3. CRM 360 View
@@ -1683,6 +2138,7 @@ function editPartner(type, id) {
     document.getElementById('new-partner-id').value = p.id;
     document.getElementById('new-partner-name').value = p.name;
     document.getElementById('new-partner-industry').value = p.industry || '';
+    document.getElementById('new-partner-tax').value = p.tax || '';
     document.getElementById('new-partner-phone').value = p.phone;
     document.getElementById('new-partner-address').value = p.address;
     
@@ -2115,20 +2571,33 @@ function confirmExportDeliveryPDF() {
 
 // GOOGLE SHEETS SYNC MODULE
 // ==========================================
-const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbzGhY-hJsP61SPKnQn0TfFDVccENnU2D1Zncd2EEKC4tTp4eUzQS3cYJCN9Zi67rXTK/exec';
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxrbzqi0RvSUOXdytY7wnZ5CKBBeO0UZT8VOHem9xttC9gs1jBZb3UvAqzY5pl7Eqi_/exec';
 let isSyncing = false;
+let initialLoadComplete = false;
 let syncTimeout = null;
 
-function requestSync() {
+function requestSync(immediate = false) {
     updateSyncUI('pending');
+    
     clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
+    if (immediate) {
         syncAllDataToGoogle();
-    }, 2000); // 2 second debounce
+    } else {
+        syncTimeout = setTimeout(() => {
+            syncAllDataToGoogle();
+        }, 2000); // 2 second debounce
+    }
 }
 
+window.addEventListener('beforeunload', function (e) {
+    if (syncTimeout || isSyncing) {
+        e.preventDefault();
+        e.returnValue = 'Dữ liệu đang được đồng bộ lên Google Sheets. Bạn có chắc muốn thoát?';
+    }
+});
+
 async function syncAllDataToGoogle() {
-    if (isSyncing) return;
+    if (isSyncing || !initialLoadComplete) return;
     isSyncing = true;
     updateSyncUI('syncing');
     
@@ -2140,6 +2609,7 @@ async function syncAllDataToGoogle() {
             "Customers": arrayToSheet(customers),
             "Suppliers": arrayToSheet(suppliers),
             "Quotes": arrayToSheet(quotes),
+            "Contracts": arrayToSheet(contracts),
             "Inventory_Tickets": arrayToSheet(inventory_tickets),
             "Cashflow": arrayToSheet(cashflow)
         }
@@ -2161,25 +2631,29 @@ async function syncAllDataToGoogle() {
         updateSyncUI('error');
     } finally {
         isSyncing = false;
+        syncTimeout = null;
     }
 }
 
 async function initGoogleSheets() {
     updateSyncUI('syncing');
     try {
-        const response = await fetch(SHEET_API_URL);
+        // Thêm tham số t= để chống trình duyệt cache dữ liệu cũ
+        const response = await fetch(SHEET_API_URL + '?t=' + Date.now(), { cache: 'no-cache' });
         const rawData = await response.json();
         
         if (rawData.Products && rawData.Products.length > 1) products = sheetToArray(rawData.Products); else products = [];
         if (rawData.Customers && rawData.Customers.length > 1) customers = sheetToArray(rawData.Customers); else customers = [];
         if (rawData.Suppliers && rawData.Suppliers.length > 1) suppliers = sheetToArray(rawData.Suppliers); else suppliers = [];
         if (rawData.Quotes && rawData.Quotes.length > 1) quotes = sheetToArray(rawData.Quotes); else quotes = [];
+        if (rawData.Contracts && rawData.Contracts.length > 1) contracts = sheetToArray(rawData.Contracts); else contracts = [];
         if (rawData.Inventory_Tickets && rawData.Inventory_Tickets.length > 1) inventory_tickets = sheetToArray(rawData.Inventory_Tickets); else inventory_tickets = [];
         if (rawData.Cashflow && rawData.Cashflow.length > 1) cashflow = sheetToArray(rawData.Cashflow); else cashflow = [];
         if (rawData.Users && rawData.Users.length > 1) users = sheetToArray(rawData.Users);
         
         updateSyncUI('success');
         updateStorageProgress();
+        initialLoadComplete = true;
         
         if (document.getElementById('app-container').style.display !== 'none') {
             initData();
@@ -2239,7 +2713,9 @@ function updateStorageProgress() {
 document.addEventListener('click', (e) => {
     const target = e.target.closest('button');
     if (target && !target.classList.contains('btn-quick-filter') && !target.classList.contains('sub-tab-btn')) {
-        requestSync();
+        if (initialLoadComplete) {
+            requestSync();
+        }
     }
 });
 
@@ -2344,6 +2820,10 @@ function sheetToArray(sheet) {
         let obj = {};
         keys.forEach((k, idx) => {
             let val = row[idx];
+            // Google Sheets tự động chuyển chuỗi số thành Number. Ta cần ép kiểu lại thành String cho các trường ID, name, phone...
+            if (typeof val === 'number' && (k.includes('id') || k === 'name' || k === 'phone' || k === 'ref_no' || k === 'reference_id')) {
+                val = String(val);
+            }
             if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
                 try { val = JSON.parse(val); } catch(e) {}
             }

@@ -158,6 +158,8 @@
                                         <th>Khách hàng</th>
                                         <th>Giá trị</th>
                                         <th>Tiến độ thanh toán</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody id="contracts-table-body"></tbody>
@@ -295,6 +297,7 @@
                             <table>
                                 <thead>
                                     <tr>
+                                        <th>STT</th>
                                         <th>SKU</th>
                                         <th>Sản phẩm</th>
                                         <th>ĐVT</th>
@@ -353,9 +356,9 @@
                                         <input type="hidden" id="import-product-id">
                                         <div class="smart-select-dropdown" id="import-product-dropdown"></div>
                                     </div>
-                                    <button class="btn-warning" onclick="showCreateSKUModal()" style="width: auto;  padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
+                                    <button class="btn-warning" onclick="clearSKUForm(); showCreateSKUModal()" style="width: auto;  padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
                                 </div>
-                                <input type="number" id="import-qty" class="input-control" placeholder="Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
+                                <input type="number" id="import-qty" class="input-control" placeholder="Nhập SL" min="1" style="flex: 1; font-weight: bold;">
                                 <input type="number" id="import-price" class="input-control" placeholder="Giá nhập" min="0" style="flex: 1;">
                                 <button class="btn-success" onclick="addToImportCart()" style="width: auto; ">Thêm</button>
                             </div>
@@ -364,8 +367,10 @@
                                 <table>
                                     <thead>
                                         <tr style="font-size:12px;">
+                                            <th>STT</th>
                                             <th>SKU</th>
                                             <th>Sản phẩm</th>
+                                            <th>ĐVT</th>
                                             <th class="text-right">Số lượng</th>
                                             <th style="width:50px;"></th>
                                         </tr>
@@ -373,7 +378,30 @@
                                     <tbody id="import-cart-body" style="font-size:13px;"></tbody>
                                 </table>
                             </div>
-                            <button class="btn-primary mt-4" onclick="createImportTicket()">Xác Nhận Nhập Kho</button>
+                            <div style="display:flex; gap:10px; margin-top: 15px;">
+                                <button class="btn-primary" style="flex:1;" onclick="createImportTicket(false)">Nhập Kho Trực Tiếp</button>
+                                <button class="btn-warning" style="flex:1;" onclick="createImportTicket(true)">Lưu Đơn Chờ (PO)</button>
+                            </div>
+                        </div>
+
+                        <!-- Đơn Chờ Nhập Hàng (PO) -->
+                        <div class="card" style="margin-bottom: 20px;">
+                            <h3 class="mb-4" style="color: var(--status-chogiao-text);">Đơn Chờ Nhập Hàng (PO)</h3>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>STT</th>
+                                            <th>Mã PO</th>
+                                            <th>Ngày lên đơn</th>
+                                            <th>Nhà CC</th>
+                                            <th class="text-right">Số lượng mặt hàng</th>
+                                            <th>Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pending-po-body"></tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <!-- Lịch sử phiếu nhập -->
@@ -386,6 +414,7 @@
                                 <table>
                                     <thead>
                                         <tr>
+                                            <th>STT</th>
                                             <th>Mã Phiếu</th>
                                             <th>Thời gian</th>
                                             <th>Nhà CC</th>
@@ -437,7 +466,7 @@
                                     <input type="hidden" id="export-product-id">
                                     <div class="smart-select-dropdown" id="export-product-dropdown"></div>
                                 </div>
-                                <input type="number" id="export-qty" class="input-control" placeholder="Nhập Số Lượng" min="1" value="1" style="flex: 1; font-weight: bold;">
+                                <input type="number" id="export-qty" class="input-control" placeholder="Nhập SL" min="1" style="flex: 1; font-weight: bold;">
                                 <button class="btn-warning" onclick="addToExportCart()" style="width: auto; ">Thêm</button>
                             </div>
 
@@ -445,8 +474,10 @@
                                 <table>
                                     <thead>
                                         <tr style="font-size:12px;">
+                                            <th>STT</th>
                                             <th>SKU</th>
                                             <th>Sản phẩm</th>
+                                            <th>ĐVT</th>
                                             <th class="text-right">Số lượng</th>
                                             <th style="width:50px;"></th>
                                         </tr>
@@ -467,6 +498,7 @@
                                 <table>
                                     <thead>
                                         <tr>
+                                            <th>STT</th>
                                             <th>Mã Phiếu</th>
                                             <th>Thời gian</th>
                                             <th>Khách hàng</th>
@@ -538,6 +570,7 @@
                                         <th>Số tiền</th>
                                         <th>Tham chiếu</th>
                                         <th>Ghi chú</th>
+                                        <th>Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody id="finance-cashflow-body"></tbody>
@@ -715,6 +748,7 @@
                 <input type="text" id="new-partner-id" class="input-control" placeholder="Mã (VD: CUS003)" style="flex: 1 1 45%;">
                 <input type="text" id="new-partner-name" class="input-control" placeholder="Tên Công ty" style="flex: 1 1 45%;">
                 <input type="text" id="new-partner-industry" class="input-control" placeholder="Lĩnh vực hoạt động" style="flex: 1 1 45%;">
+                <input type="text" id="new-partner-tax" class="input-control" placeholder="Mã số thuế" style="flex: 1 1 45%;">
                 <input type="text" id="new-partner-phone" class="input-control" placeholder="Điện thoại chung" style="flex: 1 1 45%;">
                 <input type="text" id="new-partner-address" class="input-control" placeholder="Địa chỉ" style="flex: 1 1 100%;">
                 
@@ -1231,6 +1265,118 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
                 </select>
             </div>
             <button class="btn-primary mt-4" onclick="saveUser()">Lưu Tài khoản</button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Modal Điều khoản thanh toán -->
+    <div id="modal-payment-terms" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Chọn Điều Khoản Thanh Toán</h3>
+                <button class="btn-close" onclick="closeModal('modal-payment-terms')">×</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+                <p style="font-size:14px; color:gray;">Vui lòng thiết lập các mốc thu tiền cho Hợp đồng này.</p>
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Kịch bản thanh toán:</label>
+                <select id="payment-scenario" class="input-control" onchange="toggleDepositInput()">
+                    <option value="deposit">Đặt cọc & Thanh toán sau (Công nợ)</option>
+                    <option value="prepaid">Thanh toán 100% (Trước khi giao hàng)</option>
+                    <option value="postpaid">Thanh toán 100% (Sau khi giao hàng)</option>
+                </select>
+                
+                <div id="deposit-input-group">
+                    <label style="font-weight: bold; margin-bottom: -5px;">Phần trăm Đặt cọc (%):</label>
+                    <input type="number" id="deposit-percent" class="input-control" placeholder="Ví dụ: 30" value="50" min="1" max="99">
+                </div>
+            </div>
+            <button class="btn-primary mt-4" onclick="confirmContractCreation()">Xác nhận Tạo Hợp đồng</button>
+        </div>
+    </div>
+
+    <!-- Modal Theo dõi Thanh toán -->
+    <div id="modal-payment-tracking" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Tiến độ Thu tiền Hợp đồng</h3>
+                <button class="btn-close" onclick="closeModal('modal-payment-tracking')">×</button>
+            </div>
+            <div style="margin-top: 15px;">
+                <input type="hidden" id="tracking-contract-id">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: left;">Mốc thanh toán</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: right;">Số tiền</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Trạng thái</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payment-tracking-body">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Xuất Kho Hợp Đồng -->
+    <div id="modal-contract-export" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>Giao hàng (Xuất kho theo Hợp đồng)</h3>
+                <button class="btn-close" onclick="closeModal('modal-contract-export')">×</button>
+            </div>
+            <div style="margin-top: 15px;">
+                <input type="hidden" id="export-contract-id">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: left;">Sản phẩm</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Tổng HĐ</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Đã xuất</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Còn lại</th>
+                            <th style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">Xuất đợt này</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contract-export-body">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn-primary mt-4" onclick="confirmContractExport()">Xác nhận Giao Hàng</button>
+        </div>
+    </div>
+
+    <!-- Modal Sửa Cashflow -->
+    <div id="modal-edit-cashflow" class="modal" style="z-index: 1002;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Chỉnh sửa Giao dịch (Sổ quỹ)</h3>
+                <button class="btn-close" onclick="closeModal('modal-edit-cashflow')">×</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+                <input type="hidden" id="edit-cf-id">
+                <label style="font-weight: bold; margin-bottom: -5px;">Ngày:</label>
+                <input type="date" id="edit-cf-date" class="input-control">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Loại giao dịch:</label>
+                <select id="edit-cf-type" class="input-control">
+                    <option value="in">Thu tiền</option>
+                    <option value="out">Chi tiền</option>
+                </select>
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Số tiền:</label>
+                <input type="number" id="edit-cf-amount" class="input-control">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Mã tham chiếu:</label>
+                <input type="text" id="edit-cf-ref" class="input-control">
+                
+                <label style="font-weight: bold; margin-bottom: -5px;">Ghi chú:</label>
+                <input type="text" id="edit-cf-note" class="input-control">
+            </div>
+            <button class="btn-primary mt-4" onclick="saveEditedCashflow()">Lưu Thay Đổi</button>
         </div>
     </div>
 
