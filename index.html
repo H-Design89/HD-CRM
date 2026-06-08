@@ -32,8 +32,13 @@
             <div class="sidebar-header" style="flex-direction:column; align-items:flex-start; gap:10px;">
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                     <h1 style="margin:0;">CRM-HD</h1>
-                    <div id="quick-note-btn" onclick="openQuickNote()" title="Ghi chú nhanh">
-                        📝
+                    <div style="display:flex; gap: 10px; align-items:center;">
+                        <div id="quick-price-btn" onclick="openQuickPriceList()" title="Xem nhanh Bảng Giá" style="cursor:pointer; font-size:16px;">
+                            🏷️
+                        </div>
+                        <div id="quick-note-btn" onclick="openQuickNote()" title="Ghi chú nhanh">
+                            📝
+                        </div>
                     </div>
                 </div>
                 <div style="width:100%; font-size:12px; margin-top:5px;">
@@ -356,7 +361,6 @@
                                         <input type="hidden" id="import-product-id">
                                         <div class="smart-select-dropdown" id="import-product-dropdown"></div>
                                     </div>
-                                    <button class="btn-warning" onclick="clearSKUForm(); showCreateSKUModal()" style="width: auto;  padding:10px 14px; margin:0;" title="Tạo SKU mới">+</button>
                                 </div>
                                 <input type="number" id="import-qty" class="input-control" placeholder="Nhập SL" min="1" style="flex: 1; font-weight: bold;">
                                 <input type="number" id="import-price" class="input-control" placeholder="Giá nhập" min="0" style="flex: 1;">
@@ -694,6 +698,83 @@
                 <button class="btn-close" onclick="closeModal('note-modal')">×</button>
             </div>
             <div id="note-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal Xem Nhanh Bảng Giá (Quick Price List) -->
+    <div id="modal-quick-price-list" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3>🏷️ Bảng Giá Vật Tư & Tồn Kho</h3>
+                <button class="btn-close" onclick="closeModal('modal-quick-price-list')">×</button>
+            </div>
+            <div style="margin-top: 15px; margin-bottom: 15px;">
+                <input type="text" id="search-quick-price" class="input-control" placeholder="Tìm kiếm theo Mã SKU, Tên hoặc Phân loại..." oninput="filterQuickPriceList()" style="width: 100%; margin-bottom: 0;">
+            </div>
+            <div class="table-container" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mã SKU</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Phân loại</th>
+                            <th class="text-right">Giá Bán</th>
+                            <th class="text-right">Tồn Kho</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quick-price-list-body">
+                        <!-- Render via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tạo Nhanh SKU (Quick Create) -->
+    <div id="modal-quick-create-sku" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Sản Phẩm Mới</h3>
+                <button class="btn-close" onclick="closeModal('modal-quick-create-sku')">×</button>
+            </div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">Sản phẩm này chưa có trong hệ thống. Vui lòng bổ sung để thêm nhanh vào phiếu nhập:</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <div style="grid-column: span 2;">
+                    <label for="quick-sku-id" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Mã SKU (Bắt buộc):</label>
+                    <input type="text" id="quick-sku-id" class="input-control" placeholder="VD: SKU006" style="width: 100%;">
+                </div>
+                <div style="grid-column: span 2;">
+                    <label for="quick-sku-name" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Tên sản phẩm:</label>
+                    <input type="text" id="quick-sku-name" class="input-control" placeholder="Tên sản phẩm..." style="width: 100%;">
+                </div>
+                <div>
+                    <label for="quick-sku-type" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Phân loại (Gợi ý):</label>
+                    <input type="text" id="quick-sku-type" class="input-control" list="quick-category-suggestions" placeholder="VD: Linh kiện, Pin..." style="width: 100%;">
+                    <datalist id="quick-category-suggestions"></datalist>
+                </div>
+                <div>
+                    <label for="quick-sku-unit" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Đơn vị tính:</label>
+                    <input type="text" id="quick-sku-unit" class="input-control" list="quick-unit-suggestions" placeholder="VD: Cái, Bộ..." value="Cái" style="width: 100%;">
+                    <datalist id="quick-unit-suggestions"></datalist>
+                </div>
+                <div>
+                    <label for="quick-sku-price_out" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Giá bán:</label>
+                    <input type="number" id="quick-sku-price_out" class="input-control" placeholder="0" style="width: 100%;">
+                </div>
+                <div>
+                    <label for="quick-sku-safe_stock" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Tồn tối thiểu:</label>
+                    <input type="number" id="quick-sku-safe_stock" class="input-control" placeholder="0" style="width: 100%;">
+                </div>
+                <div>
+                    <label for="quick-sku-spec-power" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Công suất:</label>
+                    <input type="text" id="quick-sku-spec-power" class="input-control" placeholder="VD: 15kW" style="width: 100%;">
+                </div>
+                <div>
+                    <label for="quick-sku-note" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Ghi chú:</label>
+                    <input type="text" id="quick-sku-note" class="input-control" placeholder="Ghi chú thêm..." style="width: 100%;">
+                </div>
+            </div>
+            <button class="btn-primary mt-4" style="width: 100%;" onclick="confirmQuickCreate()">Tạo & Cho vào giỏ</button>
         </div>
     </div>
 

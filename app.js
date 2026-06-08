@@ -490,10 +490,16 @@ function renderInventorySelects() {
 // IMPORT CART & OPERATIONS
 function addToImportCart() {
     const productId = document.getElementById('import-product-id').value;
-    const qty = parseInt(document.getElementById('import-qty').value);
+    const searchInput = document.getElementById('import-product-search').value.trim();
+    const qtyStr = document.getElementById('import-qty').value;
+    const qty = qtyStr === '' ? 0 : parseInt(qtyStr);
     
-    if (!productId) return alert('Vui lòng tìm và chọn sản phẩm từ danh sách gợi ý!');
-    if (isNaN(qty) || qty <= 0) return alert('Số lượng phải lớn hơn 0!');
+    if (isNaN(qty) || qty < 0) return alert('Số lượng không được để âm!');
+
+    if (!productId) {
+        if (!searchInput) return alert('Vui lòng tìm và chọn sản phẩm từ danh sách gợi ý!');
+        return openQuickCreateModal(searchInput);
+    }
     
     const today = new Date().toISOString().split('T')[0];
     let refNo = "Lô " + today; // Mặc định tự sinh mã lô thay vì nhập tay
@@ -515,9 +521,97 @@ function addToImportCart() {
     }
     
     document.getElementById('import-qty').value = '';
+    document.getElementById('import-price').value = '';
     document.getElementById('import-product-search').value = '';
     document.getElementById('import-product-id').value = '';
     renderImportCart();
+}
+
+function openQuickCreateModal(searchInput) {
+    let sku = searchInput;
+    let name = '';
+    
+    document.getElementById('quick-sku-id').value = sku;
+    document.getElementById('quick-sku-name').value = name;
+    document.getElementById('quick-sku-type').value = '';
+    document.getElementById('quick-sku-unit').value = 'Cái';
+    document.getElementById('quick-sku-price_out').value = '';
+    document.getElementById('quick-sku-safe_stock').value = '';
+    document.getElementById('quick-sku-spec-power').value = '';
+    document.getElementById('quick-sku-note').value = '';
+    
+    // Populate datalist with unique categories
+    const categories = new Set();
+    products.forEach(p => {
+        if (p.specs && p.specs.component_type && p.specs.component_type !== 'N/A' && p.specs.component_type.trim() !== '') {
+            categories.add(p.specs.component_type);
+        }
+    });
+    
+    const datalist = document.getElementById('quick-category-suggestions');
+    if (datalist) {
+        datalist.innerHTML = Array.from(categories).map(cat => `<option value="${cat}">`).join('');
+    }
+    
+    // Populate datalist with unique units
+    const units = new Set();
+    products.forEach(p => {
+        if (p.unit && p.unit.trim() !== '') {
+            units.add(p.unit.trim());
+        }
+    });
+    const unitDatalist = document.getElementById('quick-unit-suggestions');
+    if (unitDatalist) {
+        unitDatalist.innerHTML = Array.from(units).map(u => `<option value="${u}">`).join('');
+    }
+    
+    document.getElementById('modal-quick-create-sku').style.display = 'flex';
+}
+
+function confirmQuickCreate() {
+    const sku = document.getElementById('quick-sku-id').value.trim();
+    const name = document.getElementById('quick-sku-name').value.trim();
+    const type = document.getElementById('quick-sku-type').value.trim() || 'N/A';
+    
+    const unit = document.getElementById('quick-sku-unit').value.trim() || 'Cái';
+    const priceOut = parseInt(document.getElementById('quick-sku-price_out').value);
+    const safeStock = parseInt(document.getElementById('quick-sku-safe_stock').value);
+    const power = document.getElementById('quick-sku-spec-power').value.trim() || 'N/A';
+    const note = document.getElementById('quick-sku-note').value.trim();
+    
+    const priceIn = parseInt(document.getElementById('import-price').value);
+    
+    if (!sku) return alert("Vui lòng nhập Mã SKU!");
+    if (!name) return alert("Vui lòng nhập Tên sản phẩm!");
+    
+    if (products.find(p => p.id === sku)) {
+        return alert("Mã SKU này đã tồn tại trong kho! Vui lòng chọn mã khác.");
+    }
+    
+    const newProduct = {
+        id: sku,
+        name: name,
+        price_in: isNaN(priceIn) ? 0 : priceIn,
+        price_out: isNaN(priceOut) ? 0 : priceOut,
+        unit: unit,
+        safe_stock_level: isNaN(safeStock) ? 0 : safeStock,
+        stock: 0,
+        specs: { power: power, component_type: type, pipe_rows: 'N/A' },
+        batches: [],
+        price_history: [],
+        note: note
+    };
+    
+    products.push(newProduct);
+    
+    // Auto-fill and add to cart
+    document.getElementById('import-product-id').value = sku;
+    document.getElementById('import-product-search').value = `${sku} - ${name}`;
+    
+    closeModal('modal-quick-create-sku');
+    addToImportCart();
+    requestSync();
+    alert("Tạo mã mới và thêm vào giỏ thành công!");
 }
 
 function removeFromImportCart(index) {
@@ -786,6 +880,7 @@ function createExportTicket() {
     document.getElementById('export-ticket-note').value = '';
     renderExportCart();
     initData();
+    requestSync();
     alert('Xuất kho thành công!');
 }
 
@@ -1034,6 +1129,7 @@ function deleteTicket(ticketId) {
     // Remove ticket
     inventory_tickets = inventory_tickets.filter(x => x.id !== ticketId);
     initData();
+    requestSync();
     alert('Hủy phiếu kho và hoàn tác tồn kho thành công!');
 }
 
@@ -1121,7 +1217,7 @@ function renderCRM(filteredCus = customers, filteredSup = suppliers) {
                    <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa vĩnh viễn</button>`
                 : `<button class="btn-action-small success" style="width:auto;" onclick="event.stopPropagation(); editPartner('CUS', '${c.id}')">Sửa</button>
                    <button class="btn-action-small danger" style="margin-left:4px; width:auto;" onclick="event.stopPropagation(); deleteItem('customers', '${c.id}')">Xóa</button>`;
-            return `<tr style="${rowStyle}" class="clickable" onclick="openCustomerDetail('${c.id}')"><td>${c.id}</td><td>${c.name} ${c.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${c.industry||''}</i><br><i style="font-size:12px;color:var(--text-muted)">MST: ${c.tax||'---'}</i></td><td style="font-size: 12px;">${contacts}</td><td>${c.phone}</td><td>${(c.debt_limit||0).toLocaleString()} VNĐ</td><td>${actionBtns}</td></tr>`;
+            return `<tr style="${rowStyle}" class="clickable" onclick="openCustomerDetail('${c.id}')"><td>${c.id}</td><td>${c.name} ${c.is_deleted?'<i>(Đã xóa)</i>':''}<br><i style="font-size:12px;color:gray">${c.industry||''}</i><br><i style="font-size:12px;color:var(--text-muted)">MST: ${c.tax||'---'}</i></td><td style="font-size: 12px;">${contacts}</td><td>${c.phone}</td><td>${(c.debt_limit||0).toLocaleString('en-US')} VNĐ</td><td>${actionBtns}</td></tr>`;
         }).join('');
     }
     
@@ -1210,7 +1306,7 @@ function renderFinance() {
                 <button class="btn-action-small" style="background:#f59e0b; color:white;" onclick="editCashflow('${c.id}')">Sửa</button>
                 <button class="btn-action-small danger" onclick="deleteCashflow('${c.id}')">Xóa</button>
             `;
-            return `<tr><td>${c.date}</td><td>${c.type==='in'?'<span style="color:green;font-weight:bold">Thu</span>':'<span style="color:red;font-weight:bold">Chi</span>'}</td><td style="font-weight:bold">${c.amount.toLocaleString()}</td><td>${c.reference_id}</td><td>${c.note}</td><td>${actionBtns}</td></tr>`;
+            return `<tr><td>${c.date}</td><td>${c.type==='in'?'<span style="color:green;font-weight:bold">Thu</span>':'<span style="color:red;font-weight:bold">Chi</span>'}</td><td style="font-weight:bold">${c.amount.toLocaleString('en-US')}</td><td>${c.reference_id}</td><td>${c.note}</td><td>${actionBtns}</td></tr>`;
         }).reverse().join('');
     }
     
@@ -1224,7 +1320,7 @@ function renderFinance() {
             const remaining = ct.total_amount - paid;
             if (remaining <= 0) return '';
             totalReceivable += remaining;
-            return `<tr><td>${customer?customer.name:ct.customer_id}</td><td>${ct.id}</td><td>${ct.total_amount.toLocaleString()}</td><td style="color:green">${paid.toLocaleString()}</td><td style="color:red;font-weight:bold;">${remaining.toLocaleString()}</td></tr>`;
+            return `<tr><td>${customer?customer.name:ct.customer_id}</td><td>${ct.id}</td><td>${ct.total_amount.toLocaleString('en-US')}</td><td style="color:green">${paid.toLocaleString('en-US')}</td><td style="color:red;font-weight:bold;">${remaining.toLocaleString('en-US')}</td></tr>`;
         });
         recTbody.innerHTML = recRows.join('');
     }
@@ -1235,14 +1331,14 @@ function renderFinance() {
     const elBal = document.getElementById('dash-balance');
     const elRec = document.getElementById('dash-receivable');
 
-    if(elIn) elIn.innerText = totalIn.toLocaleString() + ' đ';
-    if(elOut) elOut.innerText = totalOut.toLocaleString() + ' đ';
+    if(elIn) elIn.innerText = totalIn.toLocaleString('en-US') + ' đ';
+    if(elOut) elOut.innerText = totalOut.toLocaleString('en-US') + ' đ';
     if(elBal) {
         const bal = totalIn - totalOut;
-        elBal.innerText = bal.toLocaleString() + ' đ';
+        elBal.innerText = bal.toLocaleString('en-US') + ' đ';
         elBal.style.color = bal < 0 ? 'red' : 'var(--primary-color)';
     }
-    if(elRec) elRec.innerText = totalReceivable.toLocaleString() + ' đ';
+    if(elRec) elRec.innerText = totalReceivable.toLocaleString('en-US') + ' đ';
 }
 
 
@@ -1252,7 +1348,7 @@ function renderHR() {
     if(hrTbody) {
         hrTbody.innerHTML = employees.map(e => {
             const projs = e.projects ? e.projects.join('<br>') : '';
-            return `<tr><td>${e.id}</td><td>${e.name}</td><td>${e.role}</td><td>${e.kpi_target.toLocaleString()}</td><td style="color:var(--primary-color)">${e.kpi_achieved.toLocaleString()}</td><td>${projs}</td></tr>`;
+            return `<tr><td>${e.id}</td><td>${e.name}</td><td>${e.role}</td><td>${e.kpi_target.toLocaleString('en-US')}</td><td style="color:var(--primary-color)">${e.kpi_achieved.toLocaleString('en-US')}</td><td>${projs}</td></tr>`;
         }).join('');
     }
 }
@@ -1270,7 +1366,7 @@ function renderSalesProducts(productArray) {
                 <td onclick="openPricingCalc('${p.id}')">${p.id}</td>
                 <td onclick="openPricingCalc('${p.id}')">${p.name}</td>
                 <td onclick="openPricingCalc('${p.id}')" style="font-size:12px">${specStr}</td>
-                <td onclick="openPriceHistory('${p.id}')" style="color:var(--primary-color); font-weight:bold; text-decoration:underline;">${p.price_out.toLocaleString()}</td>
+                <td onclick="openPriceHistory('${p.id}')" style="color:var(--primary-color); font-weight:bold; text-decoration:underline;">${p.price_out.toLocaleString('en-US')}</td>
                 <td onclick="openPricingCalc('${p.id}')">${p.stock}</td>
             </tr>`;
         }).join('');
@@ -1290,13 +1386,13 @@ function renderQuoteCart() {
     
     container.innerHTML = quoteCart.map(item => `
         <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border-color);">
-            <div><b>${item.name}</b><br><span style="font-size:12px; color:gray">${item.price.toLocaleString()} x ${item.qty}</span></div>
-            <div style="font-weight:bold">${(item.price * item.qty).toLocaleString()}</div>
+            <div><b>${item.name}</b><br><span style="font-size:12px; color:gray">${item.price.toLocaleString('en-US')} x ${item.qty}</span></div>
+            <div style="font-weight:bold">${(item.price * item.qty).toLocaleString('en-US')}</div>
         </div>
     `).join('');
     
     const total = quoteCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    document.getElementById('quote-total-price').innerText = total.toLocaleString() + ' VNĐ';
+    document.getElementById('quote-total-price').innerText = total.toLocaleString('en-US') + ' VNĐ';
 }
 
 function createQuote() {
@@ -1344,7 +1440,7 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
             let printBtn = `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:gray; margin-right:5px;" onclick="exportQuotePDF('${q.id}')">In PDF</button>`;
             let btn = q.status === 'Chờ duyệt' ? `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; margin-right:5px;" onclick="approveQuote('${q.id}')">Duyệt & Tạo HĐ</button>` : '';
             let delBtn = q.status === 'Chờ duyệt' ? `<button class="btn-action-small danger" style="padding:4px 8px; font-size:11px; width:auto;" onclick="deleteQuote('${q.id}')">Xóa</button>` : '';
-            return `<tr><td>${q.id} <button class="btn-icon" onclick="openInternalQuoteNote('${q.id}')" style="margin-left:5px; border-radius:50%; width:20px; height:20px; font-size:12px; background:#f59e0b; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Ghi chú nội bộ">i</button></td><td>${q.date}</td><td>${cus?cus.name:q.customer_id}</td><td>${q.total_amount.toLocaleString()}</td><td><span class="status-badge ${q.status==='Đã duyệt'?'status-daban':'status-baogia'}">${q.status}</span></td><td>${printBtn}${infoBtn}${btn}${delBtn}</td></tr>`;
+            return `<tr><td>${q.id} <button class="btn-icon" onclick="openInternalQuoteNote('${q.id}')" style="margin-left:5px; border-radius:50%; width:20px; height:20px; font-size:12px; background:#f59e0b; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Ghi chú nội bộ">i</button></td><td>${q.date}</td><td>${cus?cus.name:q.customer_id}</td><td>${q.total_amount.toLocaleString('en-US')}</td><td><span class="status-badge ${q.status==='Đã duyệt'?'status-daban':'status-baogia'}">${q.status}</span></td><td>${printBtn}${infoBtn}${btn}${delBtn}</td></tr>`;
         }).reverse().join('');
     }
     
@@ -1362,7 +1458,7 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
                 </div>
             ` : `<button class="btn-action-small" style="background:#3b82f6; color:white;" onclick="openPaymentTracking('${ct.id}')">Lịch sử thu</button>`;
             
-            return `<tr><td>${ct.id}<br>${exportBtn}</td><td>${ct.quote_id}</td><td>${ct.date}</td><td>${cus?cus.name:ct.customer_id}</td><td style="font-weight:bold">${ct.total_amount.toLocaleString()}</td><td style="font-size: 12px; line-height:1.4">${mStone}</td><td><span class="status-badge ${ct.status==='Hoàn thành'?'status-daban':'status-baogia'}">${ct.status}</span></td><td>${btnAction}</td></tr>`;
+            return `<tr><td>${ct.id}<br>${exportBtn}</td><td>${ct.quote_id}</td><td>${ct.date}</td><td>${cus?cus.name:ct.customer_id}</td><td style="font-weight:bold">${ct.total_amount.toLocaleString('en-US')}</td><td style="font-size: 12px; line-height:1.4">${mStone}</td><td><span class="status-badge ${ct.status==='Hoàn thành'?'status-daban':'status-baogia'}">${ct.status}</span></td><td>${btnAction}</td></tr>`;
         }).reverse().join('');
     }
 }
@@ -1518,20 +1614,20 @@ function viewQuotePricing(qId) {
         const pd = item.pricing_details;
         const bd = pd.breakdown;
         
-        let dynHtml = bd.dynamicCosts.map(d => `<li>+ ${d.name}: ${d.amount.toLocaleString()}</li>`).join('');
+        let dynHtml = bd.dynamicCosts.map(d => `<li>+ ${d.name}: ${d.amount.toLocaleString('en-US')}</li>`).join('');
         
         html += `
         <div style="margin-bottom: 20px; background: rgba(99, 102, 241, 0.05); padding: 15px; border-radius: 8px;">
             <h5 style="color:var(--primary-color); margin-bottom:10px; font-size:16px;">Sản phẩm: ${item.name}</h5>
             <ul style="list-style:none; padding:0; font-size: 14px; line-height: 1.8;">
-                <li><b>1. Giá nhập:</b> ${bd.pin.toLocaleString()}</li>
-                <li><b>2. Vận hành:</b> ${bd.op.toLocaleString()}</li>
-                <li><b>3. Vận chuyển:</b> ${bd.ship.toLocaleString()}</li>
+                <li><b>1. Giá nhập:</b> ${bd.pin.toLocaleString('en-US')}</li>
+                <li><b>2. Vận hành:</b> ${bd.op.toLocaleString('en-US')}</li>
+                <li><b>3. Vận chuyển:</b> ${bd.ship.toLocaleString('en-US')}</li>
                 <li><b>4. Chi phí khác:</b><ul style="margin-left: 15px; font-style: italic;">${dynHtml}</ul></li>
-                <li style="border-top:1px dashed var(--border-color); margin-top:5px; padding-top:5px;"><b>TỔNG CHI PHÍ GỐC:</b> ${pd.baseCost.toLocaleString()}</li>
-                <li><b>5. Lợi nhuận kỳ vọng:</b> ${pd.margin}% (${pd.profit.toLocaleString()})</li>
-                <li><b>6. Thuế suất:</b> ${pd.taxPercent}% (${pd.taxType === 'profit' ? 'Trên Lợi nhuận' : 'Trên Doanh thu'}) -> <b>Tiền thuế: ${pd.taxValue.toLocaleString()}</b></li>
-                <li style="border-top:1px solid var(--border-color); margin-top:10px; padding-top:10px; font-weight:bold; color:var(--status-daban-text); font-size:18px;">GIÁ BÁN CUỐI CÙNG: ${pd.finalPrice.toLocaleString()} VNĐ</li>
+                <li style="border-top:1px dashed var(--border-color); margin-top:5px; padding-top:5px;"><b>TỔNG CHI PHÍ GỐC:</b> ${pd.baseCost.toLocaleString('en-US')}</li>
+                <li><b>5. Lợi nhuận kỳ vọng:</b> ${pd.margin}% (${pd.profit.toLocaleString('en-US')})</li>
+                <li><b>6. Thuế suất:</b> ${pd.taxPercent}% (${pd.taxType === 'profit' ? 'Trên Lợi nhuận' : 'Trên Doanh thu'}) -> <b>Tiền thuế: ${pd.taxValue.toLocaleString('en-US')}</b></li>
+                <li style="border-top:1px solid var(--border-color); margin-top:10px; padding-top:10px; font-weight:bold; color:var(--status-daban-text); font-size:18px;">GIÁ BÁN CUỐI CÙNG: ${pd.finalPrice.toLocaleString('en-US')} VNĐ</li>
             </ul>
         </div>
         `;
@@ -1634,7 +1730,7 @@ function openPaymentTracking(ctId) {
         return `
             <tr>
                 <td style="border-bottom: 1px solid var(--border-color); padding: 8px;">${m.name}</td>
-                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: right; font-weight:bold;">${m.amount.toLocaleString()}</td>
+                <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: right; font-weight:bold;">${m.amount.toLocaleString('en-US')}</td>
                 <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center; color:${m.paid?'green':'red'}">${m.paid?'Đã thanh toán':'Chưa thanh toán'}</td>
                 <td style="border-bottom: 1px solid var(--border-color); padding: 8px; text-align: center;">${actionBtn}</td>
             </tr>
@@ -1750,8 +1846,59 @@ function saveInternalQuoteNote() {
 
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
+        if (event.target.id === 'modal-quick-create-sku') return;
         event.target.style.display = 'none';
     }
+}
+
+// --- QUICK PRICE LIST ---
+function openQuickPriceList() {
+    document.getElementById('search-quick-price').value = '';
+    renderQuickPriceList(products);
+    document.getElementById('modal-quick-price-list').style.display = 'flex';
+}
+
+function filterQuickPriceList() {
+    const kw = document.getElementById('search-quick-price').value.toLowerCase().trim();
+    const filtered = products.filter(p => !p.is_deleted && (
+        p.id.toLowerCase().includes(kw) || 
+        p.name.toLowerCase().includes(kw) || 
+        (p.specs && p.specs.component_type && p.specs.component_type.toLowerCase().includes(kw))
+    ));
+    renderQuickPriceList(filtered);
+}
+
+function renderQuickPriceList(list) {
+    const tbody = document.getElementById('quick-price-list-body');
+    if (!tbody) return;
+    
+    const activeList = list.filter(p => !p.is_deleted);
+    
+    if (activeList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="color:gray; padding: 20px;">Không tìm thấy sản phẩm nào</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = activeList.map(p => {
+        const type = p.specs && p.specs.component_type && p.specs.component_type !== 'N/A' ? p.specs.component_type : '';
+        const priceOut = p.price_out ? p.price_out.toLocaleString('en-US') + ' đ' : 'Liên hệ';
+        const stock = getProductStock(p);
+        
+        let stockStyle = 'font-weight: bold;';
+        if (stock <= 0) stockStyle += ' color: var(--status-chogiao-text);'; 
+        else if (p.safe_stock_level && stock <= p.safe_stock_level) stockStyle += ' color: #eab308;';
+        else stockStyle += ' color: var(--status-daban-text);';
+        
+        return `
+            <tr>
+                <td><b>${p.id}</b></td>
+                <td>${p.name}</td>
+                <td>${type ? `<span style="font-size: 11px; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">${type}</span>` : ''}</td>
+                <td class="text-right" style="font-weight: bold; color: var(--primary-color);">${priceOut}</td>
+                <td class="text-right"><span style="${stockStyle}">${stock}</span> <span style="font-size:11px; color:gray;">${p.unit || 'cái'}</span></td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // 1. SKU
@@ -1902,7 +2049,7 @@ function openCustomerDetail(id) {
     
     let logsHtml = (c.interaction_logs || []).map(l => `<li><b>${l.date}</b> (${l.user}): ${l.note}</li>`).join('');
     const relatedContracts = contracts.filter(ct => ct.customer_id === id);
-    let contractHtml = relatedContracts.map(ct => `<li>${ct.id} - ${ct.total_amount.toLocaleString()} VNĐ (${ct.status})</li>`).join('');
+    let contractHtml = relatedContracts.map(ct => `<li>${ct.id} - ${ct.total_amount.toLocaleString('en-US')} VNĐ (${ct.status})</li>`).join('');
     
     const content = `
         <div style="display:flex; gap: 20px;">
@@ -2028,7 +2175,7 @@ function calculatePrice(fromManualTax = false) {
     
     const finalPrice = revBeforeTax + taxValue;
     
-    document.getElementById('calc-final-price').innerText = Math.round(finalPrice).toLocaleString() + ' VNĐ';
+    document.getElementById('calc-final-price').innerText = Math.round(finalPrice).toLocaleString('en-US') + ' VNĐ';
     
     const state = {
         baseCost, profit, margin, taxValue, taxType, taxPercent, finalPrice,
@@ -2357,8 +2504,8 @@ function openPriceHistory(productId) {
         tbody.innerHTML = hist.map(h => `
             <tr>
                 <td>${h.date}</td>
-                <td>${h.old_in.toLocaleString()} ➔ <b>${h.new_in.toLocaleString()}</b></td>
-                <td>${h.old_out.toLocaleString()} ➔ <b style="color:var(--status-daban-text)">${h.new_out.toLocaleString()}</b></td>
+                <td>${h.old_in.toLocaleString('en-US')} ➔ <b>${h.new_in.toLocaleString('en-US')}</b></td>
+                <td>${h.old_out.toLocaleString('en-US')} ➔ <b style="color:var(--status-daban-text)">${h.new_out.toLocaleString('en-US')}</b></td>
             </tr>
         `).reverse().join('');
     }
@@ -2446,9 +2593,9 @@ function confirmExportQuotePDF() {
                 <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
                 <td style="border: 1px solid #000; padding: 5px; text-align: left;">${item.name}</td>
                 <td style="border: 1px solid #000; padding: 5px;">Cái</td>
-                <td style="border: 1px solid #000; padding: 5px;">${item.qty.toLocaleString()}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${item.price.toLocaleString()}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${lineTotal.toLocaleString()}</td>
+                <td style="border: 1px solid #000; padding: 5px;">${item.qty.toLocaleString('en-US')}</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${item.price.toLocaleString('en-US')}</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${lineTotal.toLocaleString('en-US')}</td>
                 <td style="border: 1px solid #000; padding: 5px;"></td>
             </tr>
         `;
@@ -2457,9 +2604,9 @@ function confirmExportQuotePDF() {
     const tax = subtotal * (vatPercent / 100);
     const total = subtotal + tax;
     
-    document.querySelector('#pdf-quote-template .pdf-quote-subtotal').innerText = subtotal.toLocaleString();
-    document.querySelector('#pdf-quote-template .pdf-quote-tax').innerText = tax.toLocaleString();
-    document.querySelector('#pdf-quote-template .pdf-quote-total').innerText = total.toLocaleString();
+    document.querySelector('#pdf-quote-template .pdf-quote-subtotal').innerText = subtotal.toLocaleString('en-US');
+    document.querySelector('#pdf-quote-template .pdf-quote-tax').innerText = tax.toLocaleString('en-US');
+    document.querySelector('#pdf-quote-template .pdf-quote-total').innerText = total.toLocaleString('en-US');
 
     const element = document.getElementById('pdf-quote-template');
     element.style.display = 'block';
@@ -2546,7 +2693,7 @@ function confirmExportDeliveryPDF() {
                 <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
                 <td style="border: 1px solid #000; padding: 5px; text-align: left;">${p ? p.name : item.product_id}</td>
                 <td style="border: 1px solid #000; padding: 5px;">${p ? p.unit : 'Cái'}</td>
-                <td style="border: 1px solid #000; padding: 5px;">${item.qty.toLocaleString()}</td>
+                <td style="border: 1px solid #000; padding: 5px;">${item.qty.toLocaleString('en-US')}</td>
                 <td style="border: 1px solid #000; padding: 5px;">Lô: ${item.ref_no || ''}</td>
             </tr>
         `;
