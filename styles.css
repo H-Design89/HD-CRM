@@ -949,3 +949,18 @@ body.view-only-mode button[onclick*="importCSV"] {
     background-color: rgba(99, 102, 241, 0.1);
     color: var(--primary-color) !important;
 }
+
+/* Print PDF Overrides */
+#pdf-templates td,
+#pdf-templates span,
+#pdf-templates p,
+#pdf-templates div,
+#pdf-templates b,
+#pdf-templates strong {
+    color: #000 !important;
+}
+#pdf-templates th {
+    color: inherit !important;
+    background-color: transparent !important;
+    position: static !important;
+}

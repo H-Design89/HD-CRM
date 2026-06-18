@@ -692,7 +692,7 @@
 
     <!-- Modal cho Ghi chú ẩn -->
     <div id="note-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h3>Ghi chú Đơn hàng</h3>
                 <button class="btn-close" onclick="closeModal('note-modal')">×</button>
@@ -868,12 +868,15 @@
             <div style="margin-top: 10px;">
                 <input type="hidden" id="calc-item-index">
                 
-                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 15px; align-items: center; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: auto 180px; gap: 15px; align-items: center; margin-bottom: 15px; white-space: nowrap;">
                     <label><b>1. Giá nhập:</b></label>
-                    <input type="number" id="calc-price-in" class="input-control" style="margin-bottom:0;" oninput="calculatePrice()">
+                    <input type="number" id="calc-price-in" class="input-control" style="margin-bottom:0;" oninput="onPinChange()">
                     
-                    <label><b>2. Giá bán đề xuất:</b></label>
-                    <input type="number" id="calc-price-out" class="input-control" style="margin-bottom:0; font-weight:bold; color:var(--primary-color);" oninput="calculatePrice()">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <b>2. Giá bán đề xuất:</b>
+                        <span style="font-size:13px; font-weight:normal; margin-left: 5px;">Hệ số: <input type="number" id="calc-multiplier" class="input-control" style="margin-bottom:0; width: 55px; display:inline-block; padding: 2px 5px; height: 24px; font-size:12px; text-align:center;" value="1.4" step="0.1" oninput="onMultiplierChange()"></span>
+                    </label>
+                    <input type="number" id="calc-price-out" class="input-control" style="margin-bottom:0; font-weight:bold; color:var(--primary-color);" oninput="onPoutChange()">
                     
                     <label style="display:flex; justify-content:space-between; align-items:center;">
                         <b>3. Lợi nhuận gộp:</b>
@@ -881,23 +884,29 @@
                     </label>
                     <input type="text" id="calc-gross-profit" class="input-control" style="margin-bottom:0; background:rgba(0,0,0,0.02);" disabled>
 
-                    <label><b>4. Chiết khấu khách (% LN gộp):</b></label>
-                    <input type="number" id="calc-discount-percent" class="input-control" style="margin-bottom:0;" value="0" oninput="calculatePrice()">
+                    <label><b>4. Chiết khấu khách (% Giá bán):</b></label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="number" id="calc-discount-percent" class="input-control" style="margin-bottom:0; flex:1; min-width: 0;" value="3" placeholder="%" oninput="onDiscountPctChange()">
+                        <input type="number" id="calc-discount-val" class="input-control" style="margin-bottom:0; flex:1.5; min-width: 0;" value="0" placeholder="VNĐ" oninput="onDiscountValChange()">
+                    </div>
                     
-                    <label><b>5. Thuế thu nhập 1 (% LN gộp):</b></label>
-                    <input type="number" id="calc-tax1-percent" class="input-control" style="margin-bottom:0;" value="20" oninput="calculatePrice()">
+                    <label><b>5. Chi phí vận hành (% Giá bán):</b></label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="number" id="calc-tax1-percent" class="input-control" style="margin-bottom:0; flex:1; min-width: 0;" value="12" placeholder="%" oninput="onTax1PctChange()">
+                        <input type="number" id="calc-tax1-val" class="input-control" style="margin-bottom:0; flex:1.5; min-width: 0;" value="0" placeholder="VNĐ" oninput="onTax1ValChange()">
+                    </div>
                     
-                    <label><b>6. Thuế thu nhập 2 (% LN gộp):</b></label>
-                    <input type="number" id="calc-tax2-percent" class="input-control" style="margin-bottom:0;" value="10" oninput="calculatePrice()">
-                    
-                    <label><b>7. Vận chuyển:</b></label>
-                    <input type="number" id="calc-cost-ship" class="input-control" style="margin-bottom:0;" value="0" oninput="calculatePrice()">
+                    <label><b>6. Thuế thu nhập (% LN gộp - CPVH):</b></label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="number" id="calc-tax2-percent" class="input-control" style="margin-bottom:0; flex:1; min-width: 0;" value="20" placeholder="%" oninput="onTax2PctChange()">
+                        <input type="number" id="calc-tax2-val" class="input-control" style="margin-bottom:0; flex:1.5; min-width: 0;" value="0" placeholder="VNĐ" oninput="onTax2ValChange()">
+                    </div>
                 </div>
             </div>
             
             <hr style="margin: 20px 0; border-color: var(--border-color);">
             <div style="text-align: right;">
-                <h3 style="margin:0;">= LỢI NHUẬN RÒNG: <span id="calc-net-profit" style="color:var(--status-daban-text); font-size: 28px;">0 VNĐ</span></h3>
+                <h3 style="margin:0;">= LỢI NHUẬN RÒNG <span id="calc-net-percent" style="font-size: 16px; color: var(--text-muted); font-weight: normal;">(0%)</span>: <span id="calc-net-profit" style="color:var(--status-daban-text); font-size: 28px;">0 VNĐ</span></h3>
             </div>
             <button class="btn-primary mt-4" onclick="saveCalculatedPrice()">Lưu Giá & Cập nhật Báo giá</button>
         </div>

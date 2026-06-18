@@ -1366,6 +1366,7 @@ function renderSalesProducts(productArray) {
                 <td onclick="openPricingCalc('${p.id}')">${p.id}</td>
                 <td onclick="openPricingCalc('${p.id}')">${p.name}</td>
                 <td onclick="openPricingCalc('${p.id}')" style="font-size:12px">${specStr}</td>
+                <td onclick="openBatchHistory('${p.id}')" style="text-decoration:underline;">${p.price_in.toLocaleString('en-US')}</td>
                 <td onclick="openPriceHistory('${p.id}')" style="color:var(--primary-color); font-weight:bold; text-decoration:underline;">${p.price_out.toLocaleString('en-US')}</td>
                 <td onclick="openPricingCalc('${p.id}')">${p.stock}</td>
             </tr>`;
@@ -1385,9 +1386,13 @@ function renderQuoteCart() {
     }
     
     container.innerHTML = quoteCart.map(item => `
-        <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border-color);">
-            <div><b>${item.name}</b><br><span style="font-size:12px; color:gray">${item.price.toLocaleString('en-US')} x ${item.qty}</span></div>
-            <div style="font-weight:bold">${(item.price * item.qty).toLocaleString('en-US')}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border-color);">
+            <div style="flex:1; padding-right:10px;"><b>${item.name}</b><br><span style="font-size:12px; color:gray">${item.price.toLocaleString('en-US')} VNĐ</span></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="number" value="${item.qty}" min="1" class="input-control" style="width:60px; margin:0; padding:2px 5px; text-align:center;" onchange="updateQuoteQty('${item.product_id}', this.value)">
+                <div style="font-weight:bold; width:100px; text-align:right;">${(item.price * item.qty).toLocaleString('en-US')}</div>
+                <button class="btn-action-small danger" style="padding: 2px 6px;" onclick="removeQuoteItem('${item.product_id}')">x</button>
+            </div>
         </div>
     `).join('');
     
@@ -1395,6 +1400,19 @@ function renderQuoteCart() {
     document.getElementById('quote-total-price').innerText = total.toLocaleString('en-US') + ' VNĐ';
 }
 
+function updateQuoteQty(productId, qty) {
+    const item = quoteCart.find(x => x.product_id === productId);
+    if(item) {
+        item.qty = parseInt(qty) || 1;
+        if(item.qty < 1) item.qty = 1;
+        renderQuoteCart();
+    }
+}
+
+function removeQuoteItem(productId) {
+    quoteCart = quoteCart.filter(x => x.product_id !== productId);
+    renderQuoteCart();
+}
 function createQuote() {
     const cusId = document.getElementById('quote-customer-select').value;
     if(!cusId || quoteCart.length === 0) return alert('Vui lòng chọn Khách hàng và Sản phẩm!');
@@ -1607,52 +1625,124 @@ function viewQuotePricing(qId) {
     const q = quotes.find(x => x.id === qId);
     if(!q) return;
     
-    let html = `<h4>Báo giá: ${q.id}</h4><hr style="margin:10px 0; border-color:var(--border-color);">`;
+    let totalRevenue = 0;
+    let totalNetProfit = 0;
+    let totalCost = 0;
+    let totalGrossProfit = 0;
+    let totalDiscount = 0;
+    let totalTax1 = 0;
+    let totalTax2 = 0;
     
     q.items.forEach(item => {
-        if(!item.pricing_details) return;
-        const pd = item.pricing_details;
+        let itemPin = 0;
+        let itemGross = 0;
+        let itemDisc = 0;
+        let itemTax1 = 0;
+        let itemTax2 = 0;
+        let itemNetProfit = 0;
         
-        if (pd.breakdown) {
-            // Tương thích ngược với báo giá cũ
-            const bd = pd.breakdown;
-            let dynHtml = bd.dynamicCosts ? bd.dynamicCosts.map(d => `<li>+ ${d.name}: ${d.amount.toLocaleString('en-US')}</li>`).join('') : '';
-            
-            html += `
-            <div style="margin-bottom: 20px; background: rgba(99, 102, 241, 0.05); padding: 15px; border-radius: 8px;">
-                <h5 style="color:var(--primary-color); margin-bottom:10px; font-size:16px;">Sản phẩm: ${item.name}</h5>
-                <ul style="list-style:none; padding:0; font-size: 14px; line-height: 1.8;">
-                    <li><b>1. Giá nhập:</b> ${bd.pin.toLocaleString('en-US')}</li>
-                    <li><b>2. Vận hành:</b> ${bd.op ? bd.op.toLocaleString('en-US') : 0}</li>
-                    <li><b>3. Vận chuyển:</b> ${bd.ship ? bd.ship.toLocaleString('en-US') : 0}</li>
-                    <li><b>4. Chi phí khác:</b><ul style="margin-left: 15px; font-style: italic;">${dynHtml}</ul></li>
-                    <li style="border-top:1px dashed var(--border-color); margin-top:5px; padding-top:5px;"><b>TỔNG CHI PHÍ GỐC:</b> ${pd.baseCost ? pd.baseCost.toLocaleString('en-US') : 0}</li>
-                    <li><b>5. Lợi nhuận kỳ vọng:</b> ${pd.margin}% (${pd.profit ? pd.profit.toLocaleString('en-US') : 0})</li>
-                    <li><b>6. Thuế suất:</b> ${pd.taxPercent}% (${pd.taxType === 'profit' ? 'Trên Lợi nhuận' : 'Trên Doanh thu'}) -> <b>Tiền thuế: ${pd.taxValue ? pd.taxValue.toLocaleString('en-US') : 0}</b></li>
-                    <li style="border-top:1px solid var(--border-color); margin-top:10px; padding-top:10px; font-weight:bold; color:var(--status-daban-text); font-size:18px;">GIÁ BÁN CUỐI CÙNG: ${pd.finalPrice.toLocaleString('en-US')} VNĐ</li>
-                </ul>
-            </div>
-            `;
+        if(item.pricing_details) {
+            const pd = item.pricing_details;
+            itemPin = pd.breakdown ? (pd.breakdown.pin || 0) : (pd.pin || 0);
+            itemNetProfit = pd.breakdown ? (pd.profit || 0) : (pd.netProfit || 0);
+            itemDisc = pd.discountVal || 0;
+            itemTax1 = pd.tax1Val || (pd.breakdown ? (pd.breakdown.op || 0) : 0);
+            itemTax2 = pd.tax2Val || (pd.breakdown ? (pd.taxValue || 0) : 0);
         } else {
-            // Logic báo giá mới
-            let grossPct = pd.pout > 0 ? (pd.grossProfit / pd.pout) * 100 : 0;
-            html += `
-            <div style="margin-bottom: 20px; background: rgba(99, 102, 241, 0.05); padding: 15px; border-radius: 8px;">
-                <h5 style="color:var(--primary-color); margin-bottom:10px; font-size:16px;">Sản phẩm: ${item.name}</h5>
-                <ul style="list-style:none; padding:0; font-size: 14px; line-height: 1.8;">
-                    <li><b>1. Giá nhập:</b> ${pd.pin.toLocaleString('en-US')}</li>
-                    <li><b>2. Giá bán đề xuất:</b> ${pd.pout.toLocaleString('en-US')}</li>
-                    <li><b>3. Lợi nhuận gộp:</b> <span style="color:var(--status-daban-text); font-weight:bold;">${pd.grossProfit.toLocaleString('en-US')}</span> <i style="font-size:12px;">(${grossPct.toFixed(1)}%)</i></li>
-                    <li><b>4. Chiết khấu khách (${pd.discountPct}% LN gộp):</b> -${Math.round(pd.discountVal).toLocaleString('en-US')}</li>
-                    <li><b>5. Thuế thu nhập 1 (${pd.tax1Pct}% LN gộp):</b> -${Math.round(pd.tax1Val).toLocaleString('en-US')}</li>
-                    <li><b>6. Thuế thu nhập 2 (${pd.tax2Pct}% LN gộp):</b> -${Math.round(pd.tax2Val).toLocaleString('en-US')}</li>
-                    <li><b>7. Vận chuyển:</b> -${pd.ship.toLocaleString('en-US')}</li>
-                    <li style="border-top:1px solid var(--border-color); margin-top:10px; padding-top:10px; font-weight:bold; color:var(--primary-color); font-size:18px;">LỢI NHUẬN RÒNG: ${Math.round(pd.netProfit).toLocaleString('en-US')} VNĐ</li>
-                </ul>
-            </div>
-            `;
+            const globalP = products.find(x => x.id === item.product_id);
+            if(globalP) itemPin = globalP.price_in || 0;
         }
+        
+        itemGross = item.price - itemPin;
+        
+        totalCost += (itemPin * item.qty);
+        totalRevenue += (item.price * item.qty);
+        totalGrossProfit += (itemGross * item.qty);
+        totalDiscount += (itemDisc * item.qty);
+        totalTax1 += (itemTax1 * item.qty);
+        totalTax2 += (itemTax2 * item.qty);
+        totalNetProfit += (itemNetProfit * item.qty);
     });
+
+    let ebt = totalGrossProfit - totalDiscount - totalTax1;
+
+    let html = `
+    <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary-color); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="margin-top:0; color:var(--primary-color); font-size: 16px;">TÓM TẮT BÁO GIÁ: ${q.id}</h4>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px;">
+            <span style="color:var(--text-muted);">Tổng Vốn Nhập:</span>
+            <span style="font-weight:bold; color:var(--text-muted);">${totalCost.toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px;">
+            <span>Tổng Doanh Thu:</span>
+            <span style="font-weight:bold;">${totalRevenue.toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px;">
+            <span>Lợi nhuận gộp <i style="font-size:12px; color:var(--text-muted);">(${totalRevenue > 0 ? (totalGrossProfit/totalRevenue*100).toFixed(1) : 0}%)</i>:</span>
+            <span>${totalGrossProfit.toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px; color:var(--text-muted);">
+            <span>Chiết khấu khách <i style="font-size:12px; color:var(--text-muted);">(${totalRevenue > 0 ? (totalDiscount/totalRevenue*100).toFixed(1) : 0}%)</i>:</span>
+            <span>-${Math.round(totalDiscount).toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px; color:var(--text-muted);">
+            <span>Chi phí vận hành <i style="font-size:12px; color:var(--text-muted);">(${totalRevenue > 0 ? (totalTax1/totalRevenue*100).toFixed(1) : 0}%)</i>:</span>
+            <span>-${Math.round(totalTax1).toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size: 14px; color:var(--text-muted);">
+            <span>Thuế thu nhập <i style="font-size:12px; color:var(--text-muted);">(${ebt > 0 ? (totalTax2/ebt*100).toFixed(1) : 0}%)</i>:</span>
+            <span>-${Math.round(totalTax2).toLocaleString('en-US')} VNĐ</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px dashed var(--border-color); padding-top:10px;">
+            <span style="color:var(--status-daban-text); font-weight:bold; font-size: 15px;">TỔNG LỢI NHUẬN RÒNG:</span>
+            <span style="color:var(--status-daban-text); font-weight:bold; font-size:18px;">${Math.round(totalNetProfit).toLocaleString('en-US')} VNĐ <span style="font-size:13px; color:var(--text-muted); font-weight:normal;">(${totalRevenue > 0 ? (totalNetProfit/totalRevenue*100).toFixed(1) : 0}%)</span></span>
+        </div>
+    </div>
+    <h4 style="margin-bottom:15px; font-size: 15px;">CHI TIẾT TỪNG SẢN PHẨM:</h4>
+    `;
+    html += `<table class="data-table" style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:10px;">
+        <thead>
+            <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border-color); color:var(--text-muted);">
+                <th style="padding:8px; text-align:left;">Sản phẩm</th>
+                <th style="padding:8px; text-align:center;">SL</th>
+                <th style="padding:8px; text-align:right;">Giá nhập</th>
+                <th style="padding:8px; text-align:right;">Giá bán</th>
+                <th style="padding:8px; text-align:right;">Tổng nhập</th>
+                <th style="padding:8px; text-align:right;">Thành tiền</th>
+                <th style="padding:8px; text-align:right;">Lợi nhuận gộp</th>
+            </tr>
+        </thead>
+        <tbody>`;
+        
+    q.items.forEach(item => {
+        let itemPin = 0;
+        if(item.pricing_details) {
+            const pd = item.pricing_details;
+            itemPin = pd.breakdown ? (pd.breakdown.pin || 0) : (pd.pin || 0);
+        } else {
+            const globalP = products.find(x => x.id === item.product_id);
+            if(globalP) itemPin = globalP.price_in || 0;
+        }
+        
+        const itemPout = item.price;
+        const itemTotalPout = itemPout * item.qty;
+        const itemTotalPin = itemPin * item.qty;
+        const itemGrossProfit = itemTotalPout - itemTotalPin;
+        
+        html += `
+            <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:8px;">${item.name}</td>
+                <td style="padding:8px; text-align:center;">${item.qty}</td>
+                <td style="padding:8px; text-align:right; color:var(--text-muted);">${itemPin.toLocaleString('en-US')}</td>
+                <td style="padding:8px; text-align:right;">${itemPout.toLocaleString('en-US')}</td>
+                <td style="padding:8px; text-align:right; color:var(--text-muted);">${itemTotalPin.toLocaleString('en-US')}</td>
+                <td style="padding:8px; text-align:right; font-weight:bold; color:var(--primary-color);">${itemTotalPout.toLocaleString('en-US')}</td>
+                <td style="padding:8px; text-align:right; font-weight:bold; color:var(--status-daban-text);">${itemGrossProfit.toLocaleString('en-US')}</td>
+            </tr>
+        `;
+    });
+    
+    html += `</tbody></table>`;
     
     document.getElementById('note-modal').querySelector('.modal-header h3').innerText = "Lịch sử Tính Giá";
     document.getElementById('note-content').innerHTML = html;
@@ -1867,7 +1957,7 @@ function saveInternalQuoteNote() {
 
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
-        if (event.target.id === 'modal-quick-create-sku') return;
+        if (event.target.id === 'modal-quick-create-sku' || event.target.id === 'modal-pricing-calc') return;
         event.target.style.display = 'none';
     }
 }
@@ -2146,47 +2236,179 @@ function openPricingCalc(product_id) {
     if(!p) return;
     
     document.getElementById('calc-item-index').value = product_id;
-    document.getElementById('calc-price-in').value = p.price_in;
-    document.getElementById('calc-price-out').value = p.price_out || p.price_in;
-    document.getElementById('calc-discount-percent').value = 0;
-    document.getElementById('calc-tax1-percent').value = 20;
-    document.getElementById('calc-tax2-percent').value = 10;
-    document.getElementById('calc-cost-ship').value = 0;
+    let pin = p.price_in || 0;
+    document.getElementById('calc-price-in').value = pin;
     
-    calculatePrice();
+    let pout = p.price_out || Math.round(pin * 1.4);
+    document.getElementById('calc-price-out').value = pout;
+    
+    let multiplier = pin > 0 ? (pout / pin).toFixed(2) : 1.4;
+    document.getElementById('calc-multiplier').value = multiplier;
+    
+    document.getElementById('calc-discount-percent').value = 3;
+    document.getElementById('calc-tax1-percent').value = 12;
+    document.getElementById('calc-tax2-percent').value = 20;
+    
+    syncValuesFromPercent();
+    calculateTotals();
     document.getElementById('modal-pricing-calc').style.display = 'flex';
 }
 
-function calculatePrice() {
+function onPinChange() {
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let multiplier = parseFloat(document.getElementById('calc-multiplier').value) || 1.4;
+    document.getElementById('calc-price-out').value = Math.round(pin * multiplier);
+    syncValuesFromPercent();
+    calculateTotals();
+}
+
+function onMultiplierChange() {
+    onPinChange();
+}
+
+function onPoutChange() {
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    if (pin > 0) {
+        document.getElementById('calc-multiplier').value = (pout / pin).toFixed(2);
+    }
+    syncValuesFromPercent();
+    calculateTotals();
+}
+
+function syncValuesFromPercent() {
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let grossProfit = pout - pin;
+    
+    let discountPct = parseFloat(document.getElementById('calc-discount-percent').value) || 0;
+    let discountVal = Math.round(pout * (discountPct / 100));
+    document.getElementById('calc-discount-val').value = discountVal;
+    
+    let tax1Pct = parseFloat(document.getElementById('calc-tax1-percent').value) || 0;
+    let tax1Val = Math.round(pout * (tax1Pct / 100));
+    document.getElementById('calc-tax1-val').value = tax1Val;
+    
+    let tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - discountVal - tax1Val) * (tax2Pct / 100));
+}
+
+function onDiscountPctChange() {
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let pct = parseFloat(document.getElementById('calc-discount-percent').value) || 0;
+    let val = Math.round(pout * (pct / 100));
+    document.getElementById('calc-discount-val').value = val;
+    
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let grossProfit = pout - pin;
+    let tax1Val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    let tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - val - tax1Val) * (tax2Pct / 100));
+    
+    calculateTotals();
+}
+
+function onDiscountValChange() {
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let val = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    document.getElementById('calc-discount-percent').value = pout > 0 ? (val / pout * 100).toFixed(2) : 0;
+    
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let grossProfit = pout - pin;
+    let tax1Val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    let tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - val - tax1Val) * (tax2Pct / 100));
+    
+    calculateTotals();
+}
+
+function onTax1PctChange() {
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let pct = parseFloat(document.getElementById('calc-tax1-percent').value) || 0;
+    let val = Math.round(pout * (pct / 100));
+    document.getElementById('calc-tax1-val').value = val;
+    
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let grossProfit = pout - pin;
+    let discountVal = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    let tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - discountVal - val) * (tax2Pct / 100));
+    
+    calculateTotals();
+}
+
+function onTax1ValChange() {
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    document.getElementById('calc-tax1-percent').value = pout > 0 ? (val / pout * 100).toFixed(2) : 0;
+    
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let grossProfit = pout - pin;
+    let discountVal = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    let tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - discountVal - val) * (tax2Pct / 100));
+    
+    calculateTotals();
+}
+
+function onTax2PctChange() {
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let grossProfit = pout - pin;
+    let discountVal = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    let tax1Val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    let pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    
+    document.getElementById('calc-tax2-val').value = Math.round((grossProfit - discountVal - tax1Val) * (pct / 100));
+    calculateTotals();
+}
+
+function onTax2ValChange() {
+    let pin = parseInt(document.getElementById('calc-price-in').value) || 0;
+    let pout = parseInt(document.getElementById('calc-price-out').value) || 0;
+    let grossProfit = pout - pin;
+    let discountVal = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    let tax1Val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    let base = grossProfit - discountVal - tax1Val;
+    let val = parseFloat(document.getElementById('calc-tax2-val').value) || 0;
+    
+    document.getElementById('calc-tax2-percent').value = base > 0 ? (val / base * 100).toFixed(2) : 0;
+    calculateTotals();
+}
+
+function calculateTotals() {
     const pin = parseInt(document.getElementById('calc-price-in').value) || 0;
     const pout = parseInt(document.getElementById('calc-price-out').value) || 0;
-    const ship = parseInt(document.getElementById('calc-cost-ship').value) || 0;
-    
-    const discountPct = parseFloat(document.getElementById('calc-discount-percent').value) || 0;
-    const tax1Pct = parseFloat(document.getElementById('calc-tax1-percent').value) || 0;
-    const tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
+    const ship = 0;
     
     const grossProfit = pout - pin;
     document.getElementById('calc-gross-profit').value = grossProfit.toLocaleString('en-US') + ' VNĐ';
     
-    // % Lợi nhuận gộp trên Giá bán
     let grossPercent = pout > 0 ? (grossProfit / pout) * 100 : 0;
     document.getElementById('calc-gross-percent').innerText = grossPercent.toFixed(1) + '%';
     
-    const discountVal = grossProfit * (discountPct / 100);
-    const tax1Val = grossProfit * (tax1Pct / 100);
-    const tax2Val = grossProfit * (tax2Pct / 100);
+    const discountVal = parseFloat(document.getElementById('calc-discount-val').value) || 0;
+    const tax1Val = parseFloat(document.getElementById('calc-tax1-val').value) || 0;
+    const tax2Val = parseFloat(document.getElementById('calc-tax2-val').value) || 0;
     
     const netProfit = grossProfit - discountVal - tax1Val - tax2Val - ship;
-    
     document.getElementById('calc-net-profit').innerText = Math.round(netProfit).toLocaleString('en-US') + ' VNĐ';
+    
+    let netPercent = pout > 0 ? (netProfit / pout) * 100 : 0;
+    if(document.getElementById('calc-net-percent')) {
+        document.getElementById('calc-net-percent').innerText = '(' + netPercent.toFixed(1) + '%)';
+    }
+    
+    const discountPct = parseFloat(document.getElementById('calc-discount-percent').value) || 0;
+    const tax1Pct = parseFloat(document.getElementById('calc-tax1-percent').value) || 0;
+    const tax2Pct = parseFloat(document.getElementById('calc-tax2-percent').value) || 0;
     
     const state = {
         pin, pout, ship, grossProfit, netProfit,
         discountPct, discountVal,
         tax1Pct, tax1Val,
         tax2Pct, tax2Val,
-        finalPrice: pout // Giữ tên trường finalPrice để tương thích với giỏ hàng
+        finalPrice: pout
     };
     document.getElementById('calc-net-profit').setAttribute('data-state', JSON.stringify(state));
 }
@@ -2206,6 +2428,23 @@ function saveCalculatedPrice() {
         existing.pricing_details = state;
     } else {
         quoteCart.push({ product_id: p.id, name: p.name, qty: 1, price: state.finalPrice, pricing_details: state });
+    }
+    
+    // Update master product price and history
+    if (p.price_out !== state.finalPrice || p.price_in !== state.pin) {
+        p.price_in = state.pin;
+        p.price_out = state.finalPrice;
+        if(!p.price_history) p.price_history = [];
+        p.price_history.push({
+            date: new Date().toISOString().replace('T', ' ').split('.')[0],
+            price_in: state.pin,
+            price_out: state.finalPrice,
+            reason: 'Cập nhật từ Bảng tính giá'
+        });
+        
+        requestSync();
+        renderSalesProducts(products);
+        renderQuickPriceList(products);
     }
     
     closeModal('modal-pricing-calc');
@@ -2626,7 +2865,18 @@ function confirmExportQuotePDF() {
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
     
-    html2pdf().set(opt).from(element).save().then(() => {
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+        previewWindow.document.write('<div style="font-family:sans-serif; padding:20px; text-align:center;">Đang tạo bản xem trước PDF, vui lòng đợi...</div>');
+    }
+
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+        const blobUrl = pdf.output('bloburl');
+        if (previewWindow) {
+            previewWindow.location.href = blobUrl;
+        } else {
+            window.open(blobUrl, '_blank');
+        }
         element.style.display = 'none';
     });
 }
@@ -2717,7 +2967,18 @@ function confirmExportDeliveryPDF() {
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
     
-    html2pdf().set(opt).from(element).save().then(() => {
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+        previewWindow.document.write('<div style="font-family:sans-serif; padding:20px; text-align:center;">Đang tạo bản xem trước PDF, vui lòng đợi...</div>');
+    }
+
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+        const blobUrl = pdf.output('bloburl');
+        if (previewWindow) {
+            previewWindow.location.href = blobUrl;
+        } else {
+            window.open(blobUrl, '_blank');
+        }
         element.style.display = 'none';
     });
 }
