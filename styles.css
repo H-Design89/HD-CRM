@@ -886,6 +886,9 @@ body.view-only-mode button[onclick*="importCSV"] {
     body {
         flex-direction: column;
     }
+    #app-container {
+        flex-direction: column;
+    }
     .sidebar {
         width: 100%;
         height: auto;
