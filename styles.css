@@ -306,6 +306,12 @@ section.active {
     gap: 24px;
 }
 
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+
 /* Forms & Inputs */
 .input-group {
     display: flex;
@@ -913,8 +919,20 @@ body.view-only-mode button[onclick*="importCSV"] {
     .sidebar-footer {
         display: none; /* Ẩn footer sidebar trên mobile hoặc thu gọn lại */
     }
-    .grid-2 {
+    .grid-2, .grid-4 {
         grid-template-columns: 1fr;
+    }
+    
+    .table-container th, .table-container td {
+        white-space: nowrap;
+    }
+    
+    .modal-content {
+        max-width: 95% !important;
+        padding: 16px;
+        margin: 10px;
+        max-height: 90vh;
+        overflow-y: auto;
     }
     .main-content {
         padding: 16px;

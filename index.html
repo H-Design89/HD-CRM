@@ -70,7 +70,7 @@
                 </li>
             </ul>
             <div class="sidebar-footer">
-                <button class="btn-success" onclick="exportDatabase()" style="width: 100%; margin-bottom: 15px; ">Lưu & Xuất Dữ Liệu</button>
+                <!-- Nút Lưu & Xuất Dữ Liệu đã bị xóa -->
 
             </div>
         </nav>
@@ -530,7 +530,7 @@
                 </div>
                 
                 <!-- Finance Dashboard (Giám đốc vận hành) -->
-                <div class="grid-2 mb-4" style="gap: 15px; grid-template-columns: repeat(4, 1fr);">
+                <div class="grid-4 mb-4" style="gap: 15px;">
                     <div class="card" style="padding: 15px; text-align: center; margin-bottom: 0;">
                         <h4 style="color: var(--text-muted); font-size: 14px; margin-bottom: 5px;">Tổng Thu</h4>
                         <div id="dash-total-in" style="font-size: 20px; font-weight: bold; color: var(--status-daban-text);">0 đ</div>
@@ -738,7 +738,7 @@
                 <button class="btn-close" onclick="closeModal('modal-quick-create-sku')">×</button>
             </div>
             <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">Sản phẩm này chưa có trong hệ thống. Vui lòng bổ sung để thêm nhanh vào phiếu nhập:</p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <div class="grid-2" style="gap: 15px; margin-top: 15px;">
                 <div style="grid-column: span 2;">
                     <label for="quick-sku-id" style="font-weight: 500; font-size: 13px; display:block; margin-bottom:5px;">Mã SKU (Bắt buộc):</label>
                     <input type="text" id="quick-sku-id" class="input-control" placeholder="VD: SKU006" style="width: 100%;">
@@ -785,7 +785,7 @@
                 <h3>Thêm mới Sản phẩm (SKU)</h3>
                 <button class="btn-close" onclick="closeModal('modal-create-sku')">×</button>
             </div>
-            <div style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-top: 15px; align-items: center;">
+            <div class="grid-2" style="gap: 10px; margin-top: 15px; align-items: center;">
                 <label for="new-sku-id" style="font-weight: 500; color: var(--text-main);">Mã SKU:</label>
                 <input type="text" id="new-sku-id" class="input-control" placeholder="VD: SKU006">
                 
