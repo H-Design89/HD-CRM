@@ -201,6 +201,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 24px 0;
+    flex-shrink: 0;
 }
 
 .sidebar-header {
@@ -895,10 +896,8 @@ body.view-only-mode button[onclick*="importCSV"] {
         padding: 15px 0;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
     }
     .sidebar-header {
         margin-bottom: 0;
