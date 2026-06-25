@@ -892,6 +892,12 @@ function renderInventoryTickets() {
     const importKw = document.getElementById('search-import-history') ? document.getElementById('search-import-history').value.toLowerCase().trim() : '';
     const exportKw = document.getElementById('search-export-history') ? document.getElementById('search-export-history').value.toLowerCase().trim() : '';
     
+    const formatMDY = (dStr) => {
+        const d = new Date(dStr);
+        if(isNaN(d)) return dStr;
+        return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+    };
+    
     const imports = inventory_tickets.filter(t => t.type === 'import');
     const exports = inventory_tickets.filter(t => t.type === 'export');
     const pendingPOs = inventory_tickets.filter(t => t.type === 'purchase_order');
@@ -908,7 +914,7 @@ function renderInventoryTickets() {
                     <tr>
                         <td>${index + 1}</td>
                         <td><b style="color:var(--status-chogiao-text);">${t.id}</b></td>
-                        <td>${t.date}</td>
+                        <td>${formatMDY(t.date)}</td>
                         <td>${partnerText}</td>
                         <td class="text-right">${t.items.length} mặt hàng</td>
                         <td>
@@ -964,7 +970,7 @@ function renderInventoryTickets() {
                 <tr class="accordion-toggle" onclick="toggleTicketDetails('${t.id}')">
                     <td>${index + 1}</td>
                     <td><b>${t.id}</b></td>
-                    <td>${t.date}</td>
+                    <td>${formatMDY(t.date)}</td>
                     <td>${partnerText}</td>
                     <td class="text-right">${t.items.length} mặt hàng</td>
                     <td>
@@ -1021,7 +1027,7 @@ function renderInventoryTickets() {
                 <tr class="accordion-toggle" onclick="toggleTicketDetails('${t.id}')">
                     <td>${index + 1}</td>
                     <td><b>${t.id}</b></td>
-                    <td>${t.date}</td>
+                    <td>${formatMDY(t.date)}</td>
                     <td>${partnerText}</td>
                     <td class="text-right">${t.items.length} mặt hàng</td>
                     <td>
@@ -1415,11 +1421,17 @@ function removeQuoteItem(productId) {
 }
 function createQuote() {
     const cusId = document.getElementById('quote-customer-select').value;
+    let customQuoteId = '';
+    const quoteIdInput = document.getElementById('quote-id-input');
+    if (quoteIdInput) customQuoteId = quoteIdInput.value.trim();
+    
     if(!cusId || quoteCart.length === 0) return alert('Vui lòng chọn Khách hàng và Sản phẩm!');
+    if(!customQuoteId) return alert('Vui lòng nhập Mã báo giá!');
+    if(quotes.some(q => q.id === customQuoteId)) return alert('Mã báo giá này đã tồn tại, vui lòng nhập mã khác!');
     
     const total = quoteCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     quotes.push({
-        id: "QT-" + Date.now(),
+        id: customQuoteId,
         date: new Date().toISOString().split('T')[0],
         customer_id: cusId,
         status: "Chờ duyệt",
@@ -1428,8 +1440,10 @@ function createQuote() {
     });
     
     quoteCart = [];
+    if (quoteIdInput) quoteIdInput.value = 'HLK/BG/' + new Date().getFullYear() + '/';
     renderQuoteCart();
     initData();
+    requestSync();
     alert('Tạo Báo giá thành công!');
 }
 
@@ -1449,6 +1463,11 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
     const cusSel = document.getElementById('quote-customer-select');
     if(cusSel) cusSel.innerHTML = '<option value="">-- Chọn Khách hàng --</option>' + activeCustomers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
+    const quoteIdInput = document.getElementById('quote-id-input');
+    if(quoteIdInput && !quoteIdInput.value) {
+        quoteIdInput.value = 'HLK/BG/' + new Date().getFullYear() + '/';
+    }
+    
     const qTbody = document.getElementById('quotes-table-body');
     if(qTbody) {
         qTbody.innerHTML = filteredQuotes.map(q => {
@@ -1467,7 +1486,7 @@ function renderSales(filteredQuotes = quotes, filteredContracts = contracts) {
         ctTbody.innerHTML = filteredContracts.map(ct => {
             const cus = customers.find(c => c.id === ct.customer_id);
             const mStone = ct.milestones ? ct.milestones.map(m => `${m.name}: <span style="color:${m.paid?'green':'red'}">${m.paid?'Đã TT':'Chưa TT'}</span>`).join('<br>') : '';
-            let exportBtn = `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:var(--status-chogiao-text); margin-top:5px;" onclick="handleSmartExport('${ct.id}')">Xuất kho tự động</button>`;
+            let exportBtn = `<button class="btn-primary" style="padding:4px 8px; font-size:11px; width:auto; background:#f59e0b; border:none; margin-top:5px;" onclick="openContractExport('${ct.id}')">Xuất kho tự động</button>`;
             
             let btnAction = ct.status !== 'Hoàn thành' ? `
                 <div style="display:flex; flex-direction:column; gap:5px;">
@@ -1519,6 +1538,8 @@ function openContractExport(contractId) {
         `;
     }).join('');
     
+    const exportIdInput = document.getElementById('export-ticket-id-input');
+    if(exportIdInput) exportIdInput.value = '';
     document.getElementById('modal-contract-export').style.display = 'flex';
 }
 
@@ -1526,6 +1547,17 @@ function confirmContractExport() {
     const ctId = document.getElementById('export-contract-id').value;
     const ct = contracts.find(x => x.id === ctId);
     if(!ct) return;
+    
+    let ticketId = "EXP-" + Date.now();
+    const exportIdInput = document.getElementById('export-ticket-id-input');
+    if (exportIdInput && exportIdInput.value.trim() !== '') {
+        ticketId = exportIdInput.value.trim();
+    }
+    
+    if(inventory_tickets.some(t => t.id === ticketId)) {
+        alert('Mã phiếu xuất này đã tồn tại, vui lòng nhập mã khác!');
+        return;
+    }
     
     const inputs = document.querySelectorAll('.export-qty-input');
     const ticketItems = [];
@@ -1578,7 +1610,6 @@ function confirmContractExport() {
     if (hasError) return;
     
     if (ticketItems.length > 0) {
-        const ticketId = "EXP-" + Date.now();
         const today = new Date().toISOString().replace('T', ' ').split('.')[0];
         
         inventory_tickets.push({
@@ -1703,6 +1734,7 @@ function viewQuotePricing(qId) {
     html += `<table class="data-table" style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:10px;">
         <thead>
             <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border-color); color:var(--text-muted);">
+                <th style="padding:8px; text-align:center; width: 40px;">STT</th>
                 <th style="padding:8px; text-align:left;">Sản phẩm</th>
                 <th style="padding:8px; text-align:center;">SL</th>
                 <th style="padding:8px; text-align:right;">Giá nhập</th>
@@ -1714,7 +1746,7 @@ function viewQuotePricing(qId) {
         </thead>
         <tbody>`;
         
-    q.items.forEach(item => {
+    q.items.forEach((item, index) => {
         let itemPin = 0;
         if(item.pricing_details) {
             const pd = item.pricing_details;
@@ -1731,6 +1763,7 @@ function viewQuotePricing(qId) {
         
         html += `
             <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:8px; text-align:center;">${index + 1}</td>
                 <td style="padding:8px;">${item.name}</td>
                 <td style="padding:8px; text-align:center;">${item.qty}</td>
                 <td style="padding:8px; text-align:right; color:var(--text-muted);">${itemPin.toLocaleString('en-US')}</td>
@@ -1756,6 +1789,10 @@ function approveQuote(qId) {
     document.getElementById('payment-scenario').value = 'deposit';
     toggleDepositInput();
     document.getElementById('deposit-percent').value = 50;
+    
+    const currentYear = new Date().getFullYear();
+    document.getElementById('contract-custom-id').value = `HLK/HĐ/${currentYear}/`;
+    
     document.getElementById('modal-payment-terms').style.display = 'flex';
 }
 
@@ -1785,8 +1822,14 @@ function confirmContractCreation() {
         milestones = [{ name: "Thanh toán 100% sau giao hàng", amount: quote.total_amount, paid: false }];
     }
     
+    const ctId = document.getElementById('contract-custom-id').value.trim();
+    if (!ctId) return alert('Vui lòng nhập mã hợp đồng!');
+    
+    if (contracts.find(c => c.id === ctId)) {
+        return alert('Mã hợp đồng này đã tồn tại, vui lòng chọn mã khác!');
+    }
+
     quote.status = 'Đã duyệt';
-    const ctId = 'HD-' + Date.now();
     contracts.push({
         id: ctId, 
         quote_id: quote.id, 
@@ -1957,7 +2000,7 @@ function saveInternalQuoteNote() {
 
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
-        if (event.target.id === 'modal-quick-create-sku' || event.target.id === 'modal-pricing-calc') return;
+        if (event.target.id === 'modal-quick-create-sku' || event.target.id === 'modal-pricing-calc' || event.target.id === 'modal-export-delivery-pdf') return;
         event.target.style.display = 'none';
     }
 }
@@ -2087,6 +2130,12 @@ function resetPartnerFields() {
     document.getElementById('new-partner-address').value = '';
     document.getElementById('contact-list-container').innerHTML = '';
     addContactRow(); // Add one initial empty row
+    
+    const delContainer = document.getElementById('delivery-list-container');
+    if (delContainer) {
+        delContainer.innerHTML = '';
+        addDeliveryInfoRow('', '', '', '', true); // Add one initial default row
+    }
 }
 
 function addContactRow(name = '', role = '', phone = '') {
@@ -2100,6 +2149,30 @@ function addContactRow(name = '', role = '', phone = '') {
         <input type="text" class="input-control contact-role" placeholder="Chức vụ" style="flex: 1; margin-bottom: 0;" value="${role}">
         <input type="text" class="input-control contact-phone" placeholder="SĐT" style="flex: 1; margin-bottom: 0;" value="${phone}">
         <button class="btn-primary" style="background: var(--status-chogiao-text); width: auto; padding: 0 10px;" onclick="this.parentElement.remove()">×</button>
+    `;
+    container.appendChild(row);
+}
+
+function addDeliveryInfoRow(company = '', contact = '', phone = '', address = '', isDefault = false) {
+    const container = document.getElementById('delivery-list-container');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'delivery-row';
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.alignItems = 'center';
+    
+    row.innerHTML = `
+        <input type="radio" name="delivery_default" value="1" title="Đặt làm mặc định" ${isDefault ? 'checked' : ''} style="margin:0; width:16px; height:16px; cursor:pointer;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+            <div style="display:flex; gap:10px;">
+                <input type="text" class="input-control del-company" placeholder="Nơi nhận (Tên Cty/CN)" style="flex:1; margin-bottom: 0;" value="${company}">
+                <input type="text" class="input-control del-contact" placeholder="Người nhận" style="flex:1; margin-bottom: 0;" value="${contact}">
+                <input type="text" class="input-control del-phone" placeholder="SĐT" style="flex:1; margin-bottom: 0;" value="${phone}">
+            </div>
+            <input type="text" class="input-control del-address" placeholder="Địa chỉ giao hàng" style="width:100%; margin-bottom: 0;" value="${address}">
+        </div>
+        <button class="btn-primary" style="background: var(--status-chogiao-text); width: auto; padding: 0 10px; height: 100%;" onclick="this.parentElement.remove()">×</button>
     `;
     container.appendChild(row);
 }
@@ -2124,6 +2197,24 @@ function saveNewPartner() {
         if(cName) contactsList.push({ name: cName, role: cRole, phone: cPhone });
     });
     
+    const deliveryRows = document.querySelectorAll('.delivery-row');
+    const deliveryInfos = [];
+    let hasChecked = false;
+    deliveryRows.forEach(row => {
+        const dCompany = row.querySelector('.del-company').value;
+        const dContact = row.querySelector('.del-contact').value;
+        const dPhone = row.querySelector('.del-phone').value;
+        const dAddress = row.querySelector('.del-address').value;
+        const dDefault = row.querySelector('input[type="radio"][name="delivery_default"]').checked;
+        if(dDefault) hasChecked = true;
+        if(dCompany || dAddress) deliveryInfos.push({ company: dCompany, contact: dContact, phone: dPhone, address: dAddress, is_default: dDefault });
+    });
+    
+    // Nếu chưa có cái nào mặc định, tự động gán cái đầu tiên làm mặc định
+    if(deliveryInfos.length > 0 && !hasChecked) {
+        deliveryInfos[0].is_default = true;
+    }
+    
     let arr = type === 'CUS' ? customers : suppliers;
     let existingP = arr.find(p => p.id === id);
     
@@ -2134,9 +2225,10 @@ function saveNewPartner() {
         existingP.phone = phone;
         existingP.address = address;
         existingP.contacts = contactsList;
+        existingP.delivery_infos = deliveryInfos;
         alert("Cập nhật đối tác thành công!");
     } else {
-        const partnerData = { id, name, industry, tax, phone, address, contacts: contactsList };
+        const partnerData = { id, name, industry, tax, phone, address, contacts: contactsList, delivery_infos: deliveryInfos };
         
         if(type === 'CUS') {
             partnerData.debt_limit = 0;
@@ -2542,6 +2634,16 @@ function editPartner(type, id) {
         addContactRow();
     }
     
+    const delContainer = document.getElementById('delivery-list-container');
+    if(delContainer) {
+        delContainer.innerHTML = '';
+        if(p.delivery_infos && p.delivery_infos.length > 0) {
+            p.delivery_infos.forEach(d => addDeliveryInfoRow(d.company, d.contact, d.phone, d.address, d.is_default));
+        } else {
+            addDeliveryInfoRow('', '', '', '', true);
+        }
+    }
+    
     document.getElementById('modal-partner-title').innerText = type === 'CUS' ? "Chỉnh sửa Khách hàng" : "Chỉnh sửa Nhà cung cấp";
     document.getElementById('new-partner-type').value = type;
     document.getElementById('modal-create-partner').style.display = 'flex';
@@ -2745,10 +2847,11 @@ function openPriceHistory(productId) {
     const hist = p.price_history || [];
     
     if(hist.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Chưa có lịch sử thay đổi giá</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Chưa có lịch sử thay đổi giá</td></tr>';
     } else {
-        tbody.innerHTML = hist.map(h => `
+        tbody.innerHTML = hist.map((h, index) => `
             <tr>
+                <td style="text-align:center;">${hist.length - index}</td>
                 <td>${h.date}</td>
                 <td>${h.old_in.toLocaleString('en-US')} ➔ <b>${h.new_in.toLocaleString('en-US')}</b></td>
                 <td>${h.old_out.toLocaleString('en-US')} ➔ <b style="color:var(--status-daban-text)">${h.new_out.toLocaleString('en-US')}</b></td>
@@ -2895,10 +2998,19 @@ function exportDeliveryPDF(ticketId) {
     
     const cus = customers.find(c => c.id === t.partner_id);
     if(cus) {
-        customerName = cus.name;
-        address = cus.address || '';
-        contact = (cus.contacts && cus.contacts.length > 0) ? cus.contacts[0].name : '';
-        phone = cus.phone || '';
+        if(cus.delivery_infos && cus.delivery_infos.length > 0) {
+            let defaultDel = cus.delivery_infos.find(d => d.is_default);
+            if(!defaultDel) defaultDel = cus.delivery_infos[0];
+            customerName = defaultDel.company || cus.name;
+            address = defaultDel.address || '';
+            contact = defaultDel.contact || '';
+            phone = defaultDel.phone || '';
+        } else {
+            customerName = cus.name;
+            address = cus.address || '';
+            contact = (cus.contacts && cus.contacts.length > 0) ? cus.contacts[0].name : '';
+            phone = cus.phone || '';
+        }
     } else {
         if(t.note && t.note.includes("HĐ")) {
             const ctId = t.note.split("HĐ ")[1];
@@ -2906,19 +3018,47 @@ function exportDeliveryPDF(ticketId) {
             if(ct) {
                 const autoCus = customers.find(c => c.id === ct.customer_id);
                 if(autoCus) {
-                    customerName = autoCus.name;
-                    address = autoCus.address || '';
-                    contact = (autoCus.contacts && autoCus.contacts.length > 0) ? autoCus.contacts[0].name : '';
-                    phone = autoCus.phone || '';
+                    if(autoCus.delivery_infos && autoCus.delivery_infos.length > 0) {
+                        let defaultDel = autoCus.delivery_infos.find(d => d.is_default);
+                        if(!defaultDel) defaultDel = autoCus.delivery_infos[0];
+                        customerName = defaultDel.company || autoCus.name;
+                        address = defaultDel.address || '';
+                        contact = defaultDel.contact || '';
+                        phone = defaultDel.phone || '';
+                    } else {
+                        customerName = autoCus.name;
+                        address = autoCus.address || '';
+                        contact = (autoCus.contacts && autoCus.contacts.length > 0) ? autoCus.contacts[0].name : '';
+                        phone = autoCus.phone || '';
+                    }
                 }
             }
         }
     }
     
+    document.getElementById('pdf-del-input-id').value = t.id;
     document.getElementById('pdf-del-input-customer').value = customerName;
     document.getElementById('pdf-del-input-address').value = address;
     document.getElementById('pdf-del-input-contact').value = contact;
     document.getElementById('pdf-del-input-phone').value = phone;
+    
+    document.getElementById('pdf-del-input-note').value = 'Giao hàng cho khách';
+    
+    // Mặc định lấy thời gian hiện tại cho ngày in
+    document.getElementById('pdf-del-input-date').value = new Date().toISOString().split('T')[0];
+    
+    const notesContainer = document.getElementById('pdf-del-items-notes-container');
+    notesContainer.innerHTML = t.items.map((item, idx) => {
+        const p = products.find(x => x.id === item.product_id);
+        const name = p ? p.name : item.product_id;
+        return `
+            <div style="display:flex; flex-direction:column; gap:3px;">
+                <label style="font-size:12px; color:var(--text-main); font-weight: 500;">${idx + 1}. ${name}</label>
+                <input type="text" class="input-control pdf-del-item-note" data-idx="${idx}" placeholder="Nhập ghi chú cho vật tư này..." style="margin:0;">
+            </div>
+        `;
+    }).join('');
+    
     document.getElementById('modal-export-delivery-pdf').style.display = 'flex';
 }
 
@@ -2932,26 +3072,69 @@ function confirmExportDeliveryPDF() {
     const contactName = document.getElementById('pdf-del-input-contact').value;
     const phone = document.getElementById('pdf-del-input-phone').value;
     const payment = document.getElementById('pdf-del-input-payment').value;
+    const contentNote = document.getElementById('pdf-del-input-note').value;
+    const deliverer = document.getElementById('pdf-del-input-deliverer').value.trim();
+    const customId = document.getElementById('pdf-del-input-id').value.trim();
+    const customDate = document.getElementById('pdf-del-input-date').value;
     
-    closeModal('modal-export-delivery-pdf');
+    if (customId !== '' && customId !== t.id) {
+        if (inventory_tickets.some(x => x.id === customId)) {
+            alert('Mã phiếu xuất này đã tồn tại, vui lòng chọn mã khác!');
+            return;
+        }
+        t.id = customId;
+        requestSync();
+        if (typeof renderInventoryHistory === 'function') renderInventoryHistory();
+    }
     
-    document.querySelector('#pdf-delivery-template .pdf-del-date').innerText = new Date(t.date).toLocaleDateString('vi-VN');
+    let changed = false;
+    if (customDate && customDate !== t.date) {
+        t.date = customDate;
+        changed = true;
+    }
+    if (changed) {
+        requestSync();
+        if (typeof renderInventoryHistory === 'function') renderInventoryHistory();
+    }
+    
+    const noteInputs = document.querySelectorAll('.pdf-del-item-note');
+    const itemNotes = Array.from(noteInputs).map(input => input.value);
+    
+    // Bỏ tự động đóng modal khi in
+    // closeModal('modal-export-delivery-pdf');
+    
+    const printDate = new Date(t.date);
+    const dateStr = `ngày ${String(printDate.getDate()).padStart(2, '0')} tháng ${String(printDate.getMonth() + 1).padStart(2, '0')} năm ${printDate.getFullYear()}`;
+    document.querySelector('#pdf-delivery-template .pdf-del-date').innerText = dateStr;
     document.querySelector('#pdf-delivery-template .pdf-del-id').innerText = t.id;
     document.querySelector('#pdf-delivery-template .pdf-del-customer').innerText = customerName;
     document.querySelector('#pdf-delivery-template .pdf-del-address').innerText = address;
     document.querySelector('#pdf-delivery-template .pdf-del-contact').innerText = contactName;
     document.querySelector('#pdf-delivery-template .pdf-del-phone').innerText = phone;
+    document.querySelector('#pdf-delivery-template .pdf-del-content').innerText = contentNote;
+    document.querySelector('#pdf-delivery-template .pdf-del-payment').innerText = payment;
+    document.querySelector('#pdf-delivery-template .pdf-del-deliverer-name').innerHTML = deliverer || '&nbsp;';
+    
+    const sigImg = document.getElementById('pdf-del-signature-img');
+    if (sigImg) {
+        if (deliverer.toUpperCase() === 'NGUYỄN ĐỨC HUY') {
+            sigImg.style.visibility = 'visible';
+        } else {
+            sigImg.style.visibility = 'hidden';
+        }
+    }
     
     const tbody = document.querySelector('#pdf-delivery-template .pdf-del-items');
     tbody.innerHTML = t.items.map((item, idx) => {
         const p = products.find(x => x.id === item.product_id);
+        const noteText = itemNotes[idx] || '';
         return `
             <tr>
                 <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
                 <td style="border: 1px solid #000; padding: 5px; text-align: left;">${p ? p.name : item.product_id}</td>
                 <td style="border: 1px solid #000; padding: 5px;">${p ? p.unit : 'Cái'}</td>
                 <td style="border: 1px solid #000; padding: 5px;">${item.qty.toLocaleString('en-US')}</td>
-                <td style="border: 1px solid #000; padding: 5px;">Lô: ${item.ref_no || ''}</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: left; font-style: italic;">${noteText}</td>
             </tr>
         `;
     }).join('');

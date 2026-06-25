@@ -973,16 +973,16 @@ body.view-only-mode button[onclick*="importCSV"] {
 }
 
 /* Print PDF Overrides */
-#pdf-templates td,
-#pdf-templates span,
-#pdf-templates p,
-#pdf-templates div,
-#pdf-templates b,
-#pdf-templates strong {
+#pdf-templates td, #pdf-quote-template td, #pdf-delivery-template td,
+#pdf-templates span, #pdf-quote-template span, #pdf-delivery-template span,
+#pdf-templates p, #pdf-quote-template p, #pdf-delivery-template p,
+#pdf-templates div, #pdf-quote-template div, #pdf-delivery-template div,
+#pdf-templates b, #pdf-quote-template b, #pdf-delivery-template b,
+#pdf-templates strong, #pdf-quote-template strong, #pdf-delivery-template strong {
     color: #000 !important;
 }
-#pdf-templates th {
-    color: inherit !important;
+#pdf-templates th, #pdf-quote-template th, #pdf-delivery-template th {
+    color: #000 !important;
     background-color: transparent !important;
     position: static !important;
 }

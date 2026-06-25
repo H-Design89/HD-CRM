@@ -112,8 +112,9 @@
                         </div>
                         <div class="card">
                             <h3 class="mb-4">Chi tiết Báo giá</h3>
-                            <div class="input-group">
-                                <select id="quote-customer-select" class="input-control"></select>
+                            <div class="input-group" style="display: flex; gap: 10px;">
+                                <input type="text" id="quote-id-input" class="input-control" placeholder="Mã báo giá (VD: HLK/BG/2026/001)" style="flex: 1;">
+                                <select id="quote-customer-select" class="input-control" style="flex: 2;"></select>
                             </div>
                             <div id="quote-items"></div>
                             <div class="total-row">
@@ -841,6 +842,15 @@
                 <div id="contact-list-container" style="width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-height: 200px; overflow-y: auto; padding-right: 5px;">
                     <!-- Dynamic contact rows will be added here -->
                 </div>
+                
+                <!-- Thông tin giao hàng -->
+                <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                    <h4 style="margin: 0;">Danh sách thông tin nhận hàng</h4>
+                    <button class="btn-success" style="width: auto; padding: 4px 10px; font-size: 12px; " onclick="addDeliveryInfoRow()">+ Thêm nơi nhận</button>
+                </div>
+                <div id="delivery-list-container" style="width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                    <!-- Dynamic delivery info rows will be added here -->
+                </div>
             </div>
             <button class="btn-primary mt-4" onclick="saveNewPartner()">Lưu Đối tác</button>
         </div>
@@ -962,6 +972,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width: 50px; text-align: center;">STT</th>
                             <th>Ngày thay đổi</th>
                             <th>Giá nhập mới</th>
                             <th>Giá bán mới</th>
@@ -1124,6 +1135,16 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
             <input type="hidden" id="export-delivery-index">
             <div style="display:flex; flex-direction:column; gap:12px; margin-top:15px;">
                 <div style="display: flex; align-items: center;">
+                    <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Mã số phiếu:</label>
+                    <input type="text" id="pdf-del-input-id" class="input-control" style="flex: 1; margin: 0;" placeholder="Mã phiếu xuất...">
+                </div>
+                
+                <div style="display: flex; align-items: center;">
+                    <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Ngày xuất phiếu:</label>
+                    <input type="date" id="pdf-del-input-date" class="input-control" style="flex: 1; margin: 0;">
+                </div>
+                
+                <div style="display: flex; align-items: center;">
                     <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Khách hàng:</label>
                     <input type="text" id="pdf-del-input-customer" class="input-control" style="flex: 1; margin: 0;" placeholder="Tên công ty hoặc khách lẻ..." value="Khách hàng B2B / Bán lẻ">
                 </div>
@@ -1144,8 +1165,24 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
                 </div>
                 
                 <div style="display: flex; align-items: center;">
+                    <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Nội dung:</label>
+                    <input type="text" id="pdf-del-input-note" class="input-control" style="flex: 1; margin: 0;" placeholder="VD: Giao hàng cho khách..." value="Giao hàng cho khách">
+                </div>
+                
+                <div style="display: flex; align-items: center;">
                     <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Thanh toán:</label>
                     <input type="text" id="pdf-del-input-payment" class="input-control" style="flex: 1; margin: 0;" placeholder="VD: Chuyển khoản" value="Chuyển khoản">
+                </div>
+                
+                <div style="display: flex; align-items: center;">
+                    <label style="width: 140px; flex-shrink: 0; margin: 0; white-space: nowrap; font-weight: bold;">Người giao hàng:</label>
+                    <input type="text" id="pdf-del-input-deliverer" class="input-control" style="flex: 1; margin: 0;" placeholder="Tên người giao..." value="NGUYỄN ĐỨC HUY">
+                </div>
+                
+                <hr style="border:0; border-top: 1px solid var(--border-color); margin: 5px 0;">
+                <label style="font-weight: bold; font-size: 14px;">Ghi chú vật tư (In ra PDF):</label>
+                <div id="pdf-del-items-notes-container" style="display:flex; flex-direction:column; gap:8px; max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                    <!-- Render item inputs via JS -->
                 </div>
             </div>
             <button class="btn-primary mt-4" onclick="confirmExportDeliveryPDF()">Xuất PDF Phiếu Xuất</button>
@@ -1247,9 +1284,9 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
 
         <!-- Phiếu Xuất Kho PDF -->
         <div id="pdf-delivery-template" style="padding: 40px; width: 800px; color: #000; background: #fff; font-family: 'Arial', sans-serif;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 5px;">
                 <div style="position: relative; width: 200px;">
-                    <img src="logo.png" style="width: 90px; height: auto;" alt="Logo" onerror="this.style.display='none'">
+                    <img src="logo.png" style="width: 70px; height: auto;" alt="Logo" onerror="this.style.display='none'">
                 </div>
                 <div style="text-align: right; font-size: 11px; line-height: 1.5; margin-left: auto;">
                     <b>CÔNG TY TNHH CÔNG NGHỆ HOÀNG LÂM KHANG</b><br>
@@ -1257,37 +1294,45 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
                     <a href="mailto:hoanglamkhang.co@gmail.com" style="color: blue; text-decoration: none;">Email: hoanglamkhang.co@gmail.com</a>
                 </div>
             </div>
-            <hr style="border: 0; border-top: 2px solid #4b8bcf; margin-top: 10px; margin-bottom: 8px;">
+            <hr style="border: 0; border-top: 2px solid #1a56db; margin-top: 5px; margin-bottom: 2px;">
+            <hr style="border: 0; border-top: 1px solid #000; margin-top: 0px; margin-bottom: 8px;">
             <div style="text-align: right; font-size: 11px; font-style: italic;">
-                TP. Hồ Chí Minh ngày <span class="pdf-del-date">...</span>
+                TP. Hồ Chí Minh, <span class="pdf-del-date">...</span>
             </div>
             <h1 style="text-align:center; color: #000; font-size: 28px; margin: 10px 0 15px 0;">PHIẾU XUẤT KHO</h1>
-            <table style="width:100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px;">
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; border: 2px solid #000;">
                 <tr>
-                    <td style="border: 1px solid #000; padding: 5px; width:50%;"><b>Khách hàng:</b> <span class="pdf-del-customer">...</span></td>
-                    <td style="border: 1px solid #000; padding: 5px; width:50%;"><b>Số Phiếu:</b> <span class="pdf-del-id">...</span></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle; width: 15%;">Khách hàng:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle; width: 50%;" class="pdf-del-customer">...</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle; width: 15%;">Số Phiếu:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle; width: 20%;" class="pdf-del-id">...</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 5px;" rowspan="2"><b>Địa chỉ giao hàng:</b> <span class="pdf-del-address">...</span></td>
-                    <td style="border: 1px solid #000; padding: 5px;"><b>Người Nhận:</b> <span class="pdf-del-contact">...</span></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" rowspan="2">Địa chỉ<br>giao hàng:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" rowspan="2" class="pdf-del-address">...</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;">Người Nhận:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" class="pdf-del-contact">...</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 5px;"><b>Điện Thoại:</b> <span class="pdf-del-phone">...</span></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;">Điện Thoại:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" class="pdf-del-phone">...</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 5px;"><b>Nội dung:</b> Giao hàng cho khách</td>
-                    <td style="border: 1px solid #000; padding: 5px;"><b>Thanh toán:</b> Chuyển khoản</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;">Nội dung:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" class="pdf-del-content">Giao hàng cho khách</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;">Thanh toán:</td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; font-weight: bold; vertical-align: middle;" class="pdf-del-payment">Chuyển khoản</td>
                 </tr>
             </table>
             <p style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">Danh mục vật tư:</p>
-            <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 30px;">
+            <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 30px; border: 2px solid #000;">
                 <thead>
                     <tr style="font-weight: bold;">
-                        <th style="border: 1px solid #000; padding: 5px;">STT</th>
-                        <th style="border: 1px solid #000; padding: 5px; width: 50%;">Nội dung Quy cách</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Đơn vị</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Số lượng</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Ghi chú</th>
+                        <th style="border: 1px solid #000; border-bottom: 2px solid #000; padding: 8px;">STT</th>
+                        <th style="border: 1px solid #000; border-bottom: 2px solid #000; padding: 8px; width: 45%;">Nội dung Quy cách</th>
+                        <th style="border: 1px solid #000; border-bottom: 2px solid #000; padding: 8px;">Đơn vị</th>
+                        <th style="border: 1px solid #000; border-bottom: 2px solid #000; padding: 8px;">Số lượng</th>
+                        <th style="border: 1px solid #000; border-bottom: 2px solid #000; padding: 8px;">Ghi chú</th>
                     </tr>
                 </thead>
                 <tbody class="pdf-del-items"></tbody>
@@ -1296,8 +1341,8 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
             <div style="display:flex; justify-content:space-between; text-align:center; font-size: 13px;">
                 <div style="position: relative; width: 300px;">
                     <b>NGƯỜI GIAO HÀNG</b><br>
-                    <img src="signature.png" style="width: 120px; margin-top: 10px;" alt="Signature" onerror="this.style.display='none'"><br>
-                    <b>NGUYỄN ĐỨC HUY</b>
+                    <img src="signature.png" id="pdf-del-signature-img" style="width: 120px; margin-top: 10px;" alt="Signature" onerror="this.style.display='none'"><br>
+                    <b class="pdf-del-deliverer-name" style="text-transform: uppercase;">NGUYỄN ĐỨC HUY</b>
                 </div>
                 <div style="width: 300px;">
                     <b>NGƯỜI NHẬN HÀNG</b>
@@ -1359,8 +1404,13 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
                 <button class="btn-close" onclick="closeModal('modal-payment-terms')">×</button>
             </div>
             <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
-                <p style="font-size:14px; color:gray;">Vui lòng thiết lập các mốc thu tiền cho Hợp đồng này.</p>
+                <p style="font-size:14px; color:gray;">Vui lòng thiết lập thông tin cho Hợp đồng này.</p>
                 
+                <label style="font-weight: bold; margin-bottom: -5px;">Mã hợp đồng:</label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="text" id="contract-custom-id" class="input-control" placeholder="Ví dụ: HLK/HĐ/2026/01" style="flex: 1; margin: 0;">
+                </div>
+
                 <label style="font-weight: bold; margin-bottom: -5px;">Kịch bản thanh toán:</label>
                 <select id="payment-scenario" class="input-control" onchange="toggleDepositInput()">
                     <option value="deposit">Đặt cọc & Thanh toán sau (Công nợ)</option>
@@ -1412,6 +1462,10 @@ Thời gian giao hàng: Trong vòng 1-2 ngày sau khi nhận được xác nhậ
             </div>
             <div style="margin-top: 15px;">
                 <input type="hidden" id="export-contract-id">
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label style="align-self: center; font-weight: 500; min-width: 100px;">Mã Phiếu Xuất:</label>
+                    <input type="text" id="export-ticket-id-input" class="input-control" placeholder="Ví dụ: PXK/2026/001" style="flex: 1;">
+                </div>
                 <table style="width:100%; border-collapse: collapse;">
                     <thead>
                         <tr>
